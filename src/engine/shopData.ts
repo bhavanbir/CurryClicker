@@ -1,0 +1,211 @@
+// Shop catalogue — single source of truth for purchasable Upgrades and
+// Decorations (framework §10 / §4.6). Costs are plain numbers (curry); the
+// store spends a Decimal derived from these. IAP cosmetics stay in
+// data/sampleData (real-money, no gameplay effect) until Epic E.
+
+import type { Upgrade, Decoration } from "../types";
+
+// --- Upgrades (one-time, some chained via prerequisiteUpgradeId) ---
+export const UPGRADES: Upgrade[] = [
+  // Click multipliers (stack multiplicatively per security_and_logic §1.3)
+  {
+    id: "wooden_spoon",
+    name: "Wooden Spoon",
+    icon: "soup_kitchen",
+    tone: "bg-amber-200",
+    description: "×1.5 cook value",
+    cost: 10_000,
+    tier: 1,
+    effect: { type: "click_multiplier", value: 1.5 },
+  },
+  {
+    id: "steel_ladle",
+    name: "Steel Ladle",
+    icon: "kitchen",
+    tone: "bg-slate-200",
+    description: "×2 cook value",
+    cost: 50_000,
+    tier: 2,
+    prerequisiteUpgradeId: "wooden_spoon",
+    effect: { type: "click_multiplier", value: 2.0 },
+  },
+  {
+    id: "golden_ladle",
+    name: "Golden Ladle",
+    icon: "star",
+    tone: "bg-yellow-200",
+    description: "×3 cook value",
+    cost: 200_000,
+    tier: 3,
+    prerequisiteUpgradeId: "steel_ladle",
+    effect: { type: "click_multiplier", value: 3.0 },
+  },
+  // Auto-production
+  {
+    id: "sous_chef",
+    name: "Sous Chef",
+    icon: "engineering",
+    tone: "bg-blue-200",
+    description: "+10 curry/sec",
+    cost: 20_000,
+    tier: 1,
+    effect: { type: "auto_cps", value: 10 },
+  },
+  {
+    id: "kitchen_brigade",
+    name: "Kitchen Brigade",
+    icon: "groups",
+    tone: "bg-indigo-200",
+    description: "+50 curry/sec",
+    cost: 100_000,
+    tier: 2,
+    prerequisiteUpgradeId: "sous_chef",
+    effect: { type: "auto_cps", value: 50 },
+  },
+  {
+    id: "industrial_pot",
+    name: "Industrial Pot",
+    icon: "factory",
+    tone: "bg-zinc-300",
+    description: "+200 curry/sec",
+    cost: 500_000,
+    tier: 3,
+    prerequisiteUpgradeId: "kitchen_brigade",
+    effect: { type: "auto_cps", value: 200 },
+  },
+  // Recipe slots
+  {
+    id: "slot_4",
+    name: "4th Slot",
+    icon: "grid_view",
+    tone: "bg-green-200",
+    description: "Unlock 4-ingredient recipes",
+    cost: 5_000,
+    tier: 1,
+    effect: { type: "recipe_slot_unlock", slotIndex: 3 },
+  },
+  {
+    id: "slot_5",
+    name: "5th Slot",
+    icon: "apps",
+    tone: "bg-emerald-200",
+    description: "Unlock 5-ingredient recipes",
+    cost: 25_000,
+    tier: 2,
+    prerequisiteUpgradeId: "slot_4",
+    effect: { type: "recipe_slot_unlock", slotIndex: 4 },
+  },
+  // Utility
+  {
+    id: "affinity_lens",
+    name: "Affinity Lens",
+    icon: "visibility",
+    tone: "bg-purple-200",
+    description: "Show exact pair affinities in the Kitchen",
+    cost: 15_000,
+    tier: 1,
+    effect: { type: "affinity_lens" },
+  },
+];
+
+// --- Decorations (passive production; some carry a special bonus; stackable) ---
+export const DECORATIONS: Decoration[] = [
+  {
+    id: "neko",
+    name: "Lucky Neko Cat",
+    icon: "pets",
+    tone: "bg-pink-200",
+    description: "+2 curry/sec",
+    cost: 5_000,
+    passiveCurryPerSec: 2,
+    passiveClickBonus: 0,
+    maxQuantity: 3,
+  },
+  {
+    id: "spatula",
+    name: "Golden Spatula Statue",
+    icon: "restaurant",
+    tone: "bg-yellow-200",
+    description: "+5 curry/sec",
+    cost: 10_000,
+    passiveCurryPerSec: 5,
+    passiveClickBonus: 0,
+    maxQuantity: 3,
+  },
+  {
+    id: "spice_rack",
+    name: "Spice Rack Deluxe",
+    icon: "kitchen",
+    tone: "bg-orange-200",
+    description: "+10/sec · +0.2 affinity to all spice pairs",
+    cost: 18_000,
+    passiveCurryPerSec: 10,
+    passiveClickBonus: 0,
+    spicePairAffinity: 0.2,
+    maxQuantity: 1,
+  },
+  {
+    id: "arcade",
+    name: "Retro Arcade Cabinet",
+    icon: "videogame_asset",
+    tone: "bg-red-200",
+    description: "+15 curry/sec",
+    cost: 25_000,
+    passiveCurryPerSec: 15,
+    passiveClickBonus: 0,
+    maxQuantity: 2,
+  },
+  {
+    id: "tandoor",
+    name: "Tandoor Oven",
+    icon: "local_fire_department",
+    tone: "bg-rose-200",
+    description: "+25/sec · +1 cook value per spice in recipe",
+    cost: 40_000,
+    passiveCurryPerSec: 25,
+    passiveClickBonus: 0,
+    spiceClickBonus: 1,
+    maxQuantity: 1,
+  },
+  {
+    id: "shrine",
+    name: "Curry Shrine",
+    icon: "temple_buddhist",
+    tone: "bg-amber-200",
+    description: "+50 curry/sec",
+    cost: 80_000,
+    passiveCurryPerSec: 50,
+    passiveClickBonus: 0,
+    maxQuantity: 1,
+  },
+  {
+    id: "neon_sign",
+    name: "Neon Sign",
+    icon: "light_mode",
+    tone: "bg-fuchsia-200",
+    description: "+80 curry/sec",
+    cost: 150_000,
+    passiveCurryPerSec: 80,
+    passiveClickBonus: 0,
+    maxQuantity: 1,
+  },
+  {
+    id: "auto_ladle",
+    name: "Auto-Ladle Machine",
+    icon: "precision_manufacturing",
+    tone: "bg-cyan-200",
+    description: "+150 curry/sec · +5 per cook",
+    cost: 300_000,
+    passiveCurryPerSec: 150,
+    passiveClickBonus: 5,
+    maxQuantity: 1,
+  },
+];
+
+export const UPGRADE_MAP: Record<string, Upgrade> = Object.fromEntries(
+  UPGRADES.map((u) => [u.id, u]),
+);
+
+export const DECORATION_MAP: Record<string, Decoration> = Object.fromEntries(
+  DECORATIONS.map((d) => [d.id, d]),
+);

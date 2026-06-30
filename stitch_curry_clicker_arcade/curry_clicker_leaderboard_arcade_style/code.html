@@ -1,0 +1,305 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Curry Clicker - Leaderboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "tertiary-container": "#da9f28",
+                      "surface-bright": "#f7f9fc",
+                      "surface-tint": "#904d00",
+                      "tertiary-fixed-dim": "#fabc44",
+                      "error-container": "#ffdad6",
+                      "on-surface": "#191c1e",
+                      "tertiary": "#7d5700",
+                      "on-secondary": "#ffffff",
+                      "on-secondary-container": "#5d6466",
+                      "inverse-surface": "#2d3133",
+                      "surface-container-high": "#e6e8eb",
+                      "surface-variant": "#e0e3e6",
+                      "outline": "#897362",
+                      "surface-container-lowest": "#ffffff",
+                      "on-surface-variant": "#564334",
+                      "on-primary-container": "#623200",
+                      "error": "#ba1a1a",
+                      "inverse-primary": "#ffb77d",
+                      "surface": "#f7f9fc",
+                      "outline-variant": "#ddc1ae",
+                      "background": "#f7f9fc",
+                      "tertiary-fixed": "#ffdeaa",
+                      "secondary": "#586062",
+                      "on-tertiary-fixed": "#271900",
+                      "on-primary": "#ffffff",
+                      "on-tertiary-fixed-variant": "#5f4100",
+                      "on-secondary-fixed-variant": "#41484a",
+                      "primary-container": "#ff8c00",
+                      "primary-fixed": "#ffdcc3",
+                      "on-secondary-fixed": "#161d1f",
+                      "on-primary-fixed": "#2f1500",
+                      "primary": "#904d00",
+                      "surface-container-highest": "#e0e3e6",
+                      "on-primary-fixed-variant": "#6e3900",
+                      "surface-container": "#eceef1",
+                      "on-error-container": "#93000a",
+                      "surface-container-low": "#f2f4f7",
+                      "surface-dim": "#d8dadd",
+                      "inverse-on-surface": "#eff1f4",
+                      "on-background": "#191c1e",
+                      "secondary-fixed-dim": "#c1c8ca",
+                      "secondary-fixed": "#dde4e6",
+                      "on-error": "#ffffff",
+                      "on-tertiary-container": "#543900",
+                      "on-tertiary": "#ffffff",
+                      "secondary-container": "#dae1e3",
+                      "primary-fixed-dim": "#ffb77d"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "xs": "4px",
+                      "md": "16px",
+                      "sm": "8px",
+                      "container-max": "1200px",
+                      "gutter": "20px",
+                      "xl": "40px",
+                      "unit": "4px",
+                      "lg": "24px"
+              },
+              "fontFamily": {
+                      "headline-lg": [
+                              "Montserrat"
+                      ],
+                      "body-md": [
+                              "Inter"
+                      ],
+                      "display-score": [
+                              "Montserrat"
+                      ],
+                      "headline-md": [
+                              "Montserrat"
+                      ],
+                      "body-lg": [
+                              "Inter"
+                      ],
+                      "label-bold": [
+                              "Inter"
+                      ],
+                      "headline-lg-mobile": [
+                              "Montserrat"
+                      ],
+                      "label-sm": [
+                              "Inter"
+                      ]
+              },
+              "fontSize": {
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "1.2",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-md": [
+                              "16px",
+                              {
+                                      "lineHeight": "1.5",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "display-score": [
+                              "48px",
+                              {
+                                      "lineHeight": "1.1",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "900"
+                              }
+                      ],
+                      "headline-md": [
+                              "20px",
+                              {
+                                      "lineHeight": "1.4",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-lg": [
+                              "18px",
+                              {
+                                      "lineHeight": "1.6",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "label-bold": [
+                              "14px",
+                              {
+                                      "lineHeight": "1",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "headline-lg-mobile": [
+                              "24px",
+                              {
+                                      "lineHeight": "1.2",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "label-sm": [
+                              "12px",
+                              {
+                                      "lineHeight": "1",
+                                      "fontWeight": "600"
+                              }
+                      ]
+              }
+            },
+          }
+        }
+    </script>
+</head>
+<body class="bg-[#fffdf8] text-on-background antialiased h-screen flex flex-col overflow-hidden">
+<!-- TopAppBar (Web) -->
+<header class="hidden md:flex bg-[#fffdf8] dark:bg-on-surface text-primary dark:text-primary-fixed border-b-4 border-on-surface shadow-[0_4px_0_0_rgba(25,28,30,1)] flex justify-between items-center w-full px-md py-sm max-w-container-max mx-auto docked full-width top-0 z-50">
+<div class="flex items-center gap-md">
+<span class="text-headline-md font-headline-md font-black text-on-surface">Curry Clicker</span>
+</div>
+<nav class="flex gap-lg">
+<a class="text-on-surface font-bold border-b-4 border-primary pb-1 text-label-bold font-label-bold flex items-center gap-sm" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">leaderboard</span>
+                Leaderboard
+            </a>
+<a class="text-on-surface-variant dark:text-surface-variant text-label-bold font-label-bold pb-1 flex items-center gap-sm hover:bg-primary-container/10 transition-colors rounded px-2" href="#">
+<span class="material-symbols-outlined">settings</span>
+                Settings
+            </a>
+</nav>
+</header>
+<!-- TopAppBar (Mobile Fallback for Branding) -->
+<header class="md:hidden flex justify-center items-center w-full px-md py-sm bg-[#fffdf8] dark:bg-on-surface border-b-4 border-on-surface shadow-[0_4px_0_0_rgba(25,28,30,1)] z-50 fixed top-0">
+<span class="text-headline-md font-headline-md font-black text-on-surface">Curry Clicker</span>
+</header>
+<!-- Main Canvas -->
+<main class="flex-1 overflow-y-auto w-full max-w-container-max mx-auto px-md py-xl md:pt-xl pt-[80px] pb-[100px] md:pb-xl flex justify-center">
+<!-- Leaderboard Card (Arcade Style) -->
+<div class="w-full max-w-3xl bg-surface-container-lowest rounded-xl border-4 border-on-surface shadow-[8px_8px_0_0_rgba(25,28,30,1)] overflow-hidden flex flex-col">
+<!-- Header -->
+<div class="px-lg py-md border-b-4 border-on-surface bg-tertiary-fixed flex justify-between items-center">
+<h1 class="text-headline-lg font-headline-lg text-on-surface flex items-center gap-sm font-black">
+<span class="material-symbols-outlined text-4xl" style="font-variation-settings: 'FILL' 1;">trophy</span>
+                    Top Chefs
+                </h1>
+<div class="bg-primary-container text-on-surface border-2 border-on-surface text-label-sm font-label-sm px-3 py-1 rounded-full uppercase tracking-wider font-bold shadow-[2px_2px_0_0_rgba(25,28,30,1)]">
+                    Season 4
+                </div>
+</div>
+<!-- List Container -->
+<div class="flex-1 overflow-y-auto p-md space-y-sm bg-[#fffdf8]">
+<!-- Rank 1 -->
+<div class="flex items-center gap-md p-md bg-[#ffe8c4] rounded-lg border-2 border-on-surface hover:-translate-y-1 transition-transform shadow-[4px_4px_0_0_rgba(25,28,30,1)]">
+<div class="w-10 text-center font-display-score text-3xl text-on-surface font-black">1</div>
+<div class="w-12 h-12 rounded-full overflow-hidden border-2 border-on-surface bg-white shrink-0">
+<img class="w-full h-full object-cover" data-alt="A stylized, flat-vector cartoon avatar of a top chef wearing a golden toque, set against a vibrant bright yellow background. The art style is energetic, modern arcade, high contrast, clean vectors. Professional lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuClxpELoVEC339dnUOcf3nCfNr03Dug8uPTfVwZHkX-Dbitv8oz5ceFoaWB7JceAHd2plymTjZMA4juYX3KNN__3EBHJqf-qXgn9cgI3sMsDhC1NrBhiL2Bl-3k5bal9Io-ZxQrwOWkCYTEwSNCUVA92YOlr-GYkva1zDC7ntpz01T7cdDrBrdD0lqIQXEGCpLPSoD4-p9dhIgTFERWsRobDt8Mh4NlDtxUeKQ5Uu3RiCN_hVQ-b13Tj16VX77g2eO04E9CeNMLeTU">
+</div>
+<div class="flex-1 min-w-0">
+<div class="text-headline-md font-headline-md text-on-surface truncate font-bold">SpicyBoi99</div>
+<div class="text-label-sm font-label-sm text-on-surface-variant truncate">Master of Masala</div>
+</div>
+<div class="text-right">
+<div class="text-headline-md font-headline-md text-on-surface font-black">14.2B</div>
+<div class="text-label-sm font-label-sm text-on-surface-variant font-bold">Curries</div>
+</div>
+</div>
+<!-- Rank 2 -->
+<div class="flex items-center gap-md p-md bg-white rounded-lg border-2 border-on-surface hover:-translate-y-1 transition-transform shadow-[4px_4px_0_0_rgba(25,28,30,1)]">
+<div class="w-10 text-center font-display-score text-2xl text-on-surface font-bold">2</div>
+<div class="w-12 h-12 rounded-full overflow-hidden border-2 border-on-surface bg-surface-container shrink-0">
+<img class="w-full h-full object-cover" data-alt="A stylized, flat-vector cartoon avatar of a player character with cool blue hair and a silver headband, set against a light blue background. Modern arcade aesthetic, crisp vectors, solid bright colors." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCjQYcH4Acxwsga-U9oINXXkVtW-zPMIJsvrQUJSfS21wZMhCfcitOQx9hr3ONyAhuaFRUsIwCxZy7ZtozbbdDiL9GScbOySLHh5rqy8qmL1TIJaGHU3fYF-LxX4-BSkPDOSHPJcfQrksec0RR2J9Wf-5FfLZZnrbUZVJFHcJeERVCP8ke5RrqxJFqGVoR1ewDuV_2TrBbLF1sDhDQBrUjdQP5bPDJLk94nVwMeiDtqzqk8gIE3ZrXaYhlzYgZqn9FhxHlnHs8hCxY">
+</div>
+<div class="flex-1 min-w-0">
+<div class="text-headline-md font-headline-md text-on-surface truncate font-bold">GaramGorilla</div>
+</div>
+<div class="text-right">
+<div class="text-headline-md font-headline-md text-on-surface font-bold">12.8B</div>
+</div>
+</div>
+<!-- Rank 3 -->
+<div class="flex items-center gap-md p-md bg-white rounded-lg border-2 border-on-surface hover:-translate-y-1 transition-transform shadow-[4px_4px_0_0_rgba(25,28,30,1)]">
+<div class="w-10 text-center font-display-score text-2xl text-on-surface font-bold">3</div>
+<div class="w-12 h-12 rounded-full overflow-hidden border-2 border-on-surface bg-surface-container shrink-0">
+<img class="w-full h-full object-cover" data-alt="A stylized, flat-vector cartoon avatar of a female chef with bronze goggles and an apron, set against a soft orange background. High energy, casual gaming art style, clean lines." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCHolKdgAVQoF0xlklhbuj8p65X9YbmTTsUklJBfmCRlssB4JOO5eAPizQ8Oipj7aQ2Rgt-TN95NdniKgrJqyjhgHRdIYdi4GhAG2kX0HnfTgMMYRZFcWpJaoAV6QorQSYCasVVkFQ_Z6M1RpbaTKtZ0JarRgcZy-XRooX6boLMhE56Y9qUJymCPAuLv9lniAoY33gf-0FlROr5RYfEhwX4K1B1u7gLF8HHu3twwJejMW0OxXyte-JUuguJPux3_hqls-z1_OnBM0E">
+</div>
+<div class="flex-1 min-w-0">
+<div class="text-headline-md font-headline-md text-on-surface truncate font-bold">TikkaTaco</div>
+</div>
+<div class="text-right">
+<div class="text-headline-md font-headline-md text-on-surface font-bold">10.1B</div>
+</div>
+</div>
+<!-- Spacer / Ellipsis for design -->
+<div class="py-sm flex justify-center text-on-surface font-black">
+<span class="material-symbols-outlined text-3xl">more_vert</span>
+</div>
+<!-- Rank 42 (Current Player - Highlighted) -->
+<div class="flex items-center gap-md p-md bg-primary-container rounded-lg border-4 border-on-surface shadow-[6px_6px_0_0_rgba(25,28,30,1)] relative scale-[1.02] z-10 my-md hover:-translate-y-1 transition-transform">
+<div class="absolute -top-4 left-1/2 -translate-x-1/2 bg-on-surface text-on-primary text-label-sm font-label-sm px-4 py-1.5 rounded-full uppercase font-black tracking-widest shadow-[2px_2px_0_0_rgba(255,140,0,1)]">
+                        You
+                    </div>
+<div class="w-10 text-center font-display-score text-3xl text-on-surface font-black">42</div>
+<div class="w-12 h-12 rounded-full overflow-hidden border-2 border-on-surface bg-white shrink-0">
+<img class="w-full h-full object-cover" data-alt="A stylized, flat-vector cartoon avatar representing the player, perhaps a generic but cool looking novice chef with a determined expression. White background, modern arcade UI style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCui954PH_MULpfK48_FaKMKV3hfI31P238sOUEcOrv38Vk3pLJ-QAJ_jr5jgRCQ0ALod-WmNEtne6WZInGYbNjoxR-7bPTrQ7EjWNsLuTIs-tQU8f3ejnwr2L3Pqm0yxjVGt0fKMoFYqDyUSX0SKdoQBaEKoD1YIPVImKY7nDETVt9b_tybJ9ZsVrC8O5JMnZiP8nf7qWQlyHdZamp73ZAnZ3TyxFgtuIhOEpYXMiHLzbEi-LUJdCjRkhjYI0IvtYv62YfDKISl3I">
+</div>
+<div class="flex-1 min-w-0">
+<div class="text-headline-md font-headline-md text-on-surface truncate font-black">CurryNewbie</div>
+<div class="text-label-sm font-label-sm text-on-surface/80 truncate font-bold">Rising Star</div>
+</div>
+<div class="text-right">
+<div class="text-headline-md font-headline-md text-on-surface font-black">4.2M</div>
+</div>
+</div>
+<!-- Rank 43 -->
+<div class="flex items-center gap-md p-md bg-white rounded-lg border-2 border-on-surface hover:-translate-y-1 transition-transform shadow-[4px_4px_0_0_rgba(25,28,30,1)]">
+<div class="w-10 text-center font-display-score text-xl text-on-surface-variant font-bold">43</div>
+<div class="w-12 h-12 rounded-full border-2 border-on-surface bg-surface-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-on-surface">person</span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="text-body-lg font-body-lg text-on-surface truncate font-bold">VindalooViper</div>
+</div>
+<div class="text-right">
+<div class="text-body-lg font-body-lg text-on-surface-variant font-bold">4.1M</div>
+</div>
+</div>
+</div>
+<!-- Footer Action -->
+<div class="p-md bg-surface-container-low border-t-4 border-on-surface">
+<button class="w-full bg-primary-container text-on-surface font-black text-headline-md py-4 rounded-lg border-4 border-on-surface shadow-[4px_4px_0_0_rgba(25,28,30,1)] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_rgba(25,28,30,1)] active:translate-y-[4px] active:shadow-none transition-all flex justify-center items-center gap-sm">
+<span class="material-symbols-outlined text-3xl font-bold">refresh</span>
+                    Refresh Standings
+                </button>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Mobile) -->
+<nav class="md:hidden fixed bottom-0 w-full z-50 border-t-4 border-on-surface bg-[#fffdf8] shadow-[0_-4px_0_0_rgba(25,28,30,1)] left-0 right-0 flex justify-around items-center px-md pb-md pt-sm">
+<button class="flex flex-col items-center justify-center text-on-surface px-4 py-1 hover:scale-105 transition-transform active:scale-90 duration-75">
+<span class="material-symbols-outlined text-2xl mb-1">shopping_cart</span>
+<span class="text-label-sm font-label-sm font-bold">Store</span>
+</button>
+<button class="flex flex-col items-center justify-center bg-primary-container text-on-surface border-2 border-on-surface shadow-[2px_2px_0_0_rgba(25,28,30,1)] rounded-xl px-6 py-2 hover:translate-y-[1px] hover:shadow-[1px_1px_0_0_rgba(25,28,30,1)] active:translate-y-[2px] active:shadow-none transition-all duration-75">
+<span class="material-symbols-outlined text-2xl mb-1" style="font-variation-settings: 'FILL' 1;">restaurant</span>
+<span class="text-label-sm font-label-sm font-black">Ingredients</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface px-4 py-1 hover:scale-105 transition-transform active:scale-90 duration-75">
+<span class="material-symbols-outlined text-2xl mb-1">menu_book</span>
+<span class="text-label-sm font-label-sm font-bold">Recipes</span>
+</button>
+</nav>
+</body></html>

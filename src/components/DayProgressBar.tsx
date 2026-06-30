@@ -1,0 +1,24 @@
+import { useGameStore } from "../store/useGameStore";
+import { DAYS_PER_WEEK } from "../config";
+
+export function DayProgressBar() {
+  const currentDay = useGameStore((s) => s.currentDay);
+  const dayProgress = useGameStore((s) => s.dayProgress);
+
+  return (
+    <div className="w-full">
+      <div className="mb-1 flex items-center justify-between text-[11px] font-bold uppercase tracking-wide text-ink/55">
+        <span>
+          Day {currentDay}/{DAYS_PER_WEEK}
+        </span>
+        <span>{Math.floor(dayProgress * 100)}%</span>
+      </div>
+      <div className="h-3 w-full overflow-hidden rounded-full border-2 border-ink bg-white">
+        <div
+          className="h-full bg-primary transition-[width] duration-150 ease-linear"
+          style={{ width: `${Math.min(dayProgress * 100, 100)}%` }}
+        />
+      </div>
+    </div>
+  );
+}

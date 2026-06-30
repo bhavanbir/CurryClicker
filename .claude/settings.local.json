@@ -1,0 +1,14 @@
+{
+  "enabledPlugins": {
+    "engineering-skills@claude-code-skills": true,
+    "engineering-advanced-skills@claude-code-skills": true,
+    "ra-qm-skills@claude-code-skills": true,
+    "pm-skills@claude-code-skills": true,
+    "frontend-design@claude-plugins-official": true
+  },
+  "permissions": {
+    "allow": [
+      "PowerShell(npm run *)"
+    ]
+  }
+}
