@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useGameLoop } from "./hooks/useGameLoop";
 import { useWeeklySeed } from "./hooks/useWeeklySeed";
 import { useGameStore } from "./store/useGameStore";
@@ -12,34 +13,82 @@ import { LeaderboardScreen } from "./screens/LeaderboardScreen";
 import { ProfileScreen } from "./screens/ProfileScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 import { LoginScreen } from "./screens/LoginScreen";
+import { AffinityJournalScreen } from "./screens/AffinityJournalScreen";
+import { FranchiseScreen } from "./screens/FranchiseScreen";
 import { WeekSummaryModal } from "./components/WeekSummaryModal";
 import { RewardsLayer } from "./components/RewardsLayer";
+import { ShopNotifier } from "./components/ShopNotifier";
+import { Onboarding } from "./components/Onboarding";
+import {
+  setSfxEnabled,
+  setSfxVolume,
+  setMusicVolume,
+  setMusicEnabled,
+} from "./lib/sfx";
+import { IS_DEMO } from "./target";
 
 export default function App() {
   useWeeklySeed();
   useGameLoop();
 
   const phase = useGameStore((s) => s.phase);
+  const sfxOn = useGameStore((s) => s.sfxOn);
+  const musicOn = useGameStore((s) => s.musicOn);
+  const sfxVolume = useGameStore((s) => s.sfxVolume);
+  const musicVolume = useGameStore((s) => s.musicVolume);
+  const hasOnboarded = useGameStore((s) => s.hasOnboarded);
   const [screen, setScreen] = useState<Screen>("gameplay");
+  const reduced = useReducedMotion() ?? false;
+
+  // Keep the sound engine in sync with the settings.
+  useEffect(() => setSfxEnabled(sfxOn), [sfxOn]);
+  useEffect(() => setSfxVolume(sfxVolume), [sfxVolume]);
+  useEffect(() => setMusicVolume(musicVolume), [musicVolume]);
+  useEffect(() => setMusicEnabled(musicOn), [musicOn]);
+
+  // The demo build has no online features — coerce any gated screen back to
+  // gameplay so a stray navigation can never land on a hidden screen.
+  const visibleScreen: Screen =
+    IS_DEMO && (screen === "leaderboard" || screen === "login")
+      ? "gameplay"
+      : screen;
 
   return (
     <div className="min-h-[100dvh] w-full">
-      <TopBar screen={screen} onNavigate={setScreen} />
+      <TopBar screen={visibleScreen} onNavigate={setScreen} />
 
       <main className="mx-auto w-full max-w-container px-3 pb-28 pt-[72px] sm:px-4 md:pb-8">
-        {screen === "gameplay" && <GameplayScreen onNavigate={setScreen} />}
-        {screen === "kitchen" && <KitchenScreen onNavigate={setScreen} />}
-        {screen === "store" && <StoreScreen />}
-        {screen === "leaderboard" && <LeaderboardScreen />}
-        {screen === "profile" && <ProfileScreen onNavigate={setScreen} />}
-        {screen === "settings" && <SettingsScreen onNavigate={setScreen} />}
-        {screen === "login" && <LoginScreen onNavigate={setScreen} />}
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={visibleScreen}
+            initial={reduced ? false : { opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{
+              opacity: 0,
+              y: reduced ? 0 : -6,
+              transition: { duration: reduced ? 0 : 0.1, ease: "easeIn" },
+            }}
+            transition={{ duration: reduced ? 0 : 0.15, ease: "easeOut" }}
+          >
+            {visibleScreen === "gameplay" && <GameplayScreen onNavigate={setScreen} />}
+            {visibleScreen === "kitchen" && <KitchenScreen onNavigate={setScreen} />}
+            {visibleScreen === "store" && <StoreScreen />}
+            {visibleScreen === "leaderboard" && !IS_DEMO && <LeaderboardScreen />}
+            {visibleScreen === "profile" && <ProfileScreen onNavigate={setScreen} />}
+            {visibleScreen === "settings" && <SettingsScreen onNavigate={setScreen} />}
+            {visibleScreen === "login" && !IS_DEMO && <LoginScreen onNavigate={setScreen} />}
+            {visibleScreen === "journal" && <AffinityJournalScreen onNavigate={setScreen} />}
+            {visibleScreen === "franchise" && <FranchiseScreen onNavigate={setScreen} />}
+          </motion.div>
+        </AnimatePresence>
       </main>
 
-      <BottomNav screen={screen} onNavigate={setScreen} />
+      <BottomNav screen={visibleScreen} onNavigate={setScreen} />
 
-      {phase === "week_summary" && <WeekSummaryModal />}
+      {phase === "week_summary" && <WeekSummaryModal onNavigate={setScreen} />}
       <RewardsLayer />
+      <ShopNotifier onNavigate={setScreen} />
+      {!hasOnboarded && <Onboarding />}
     </div>
   );
 }

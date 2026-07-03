@@ -2,6 +2,8 @@ import { useGameStore } from "../store/useGameStore";
 import { formatCurry } from "../lib/format";
 import { SAMPLE_RANKS, type RankRow } from "../data/sampleData";
 import { Icon } from "../components/arcade/Icon";
+import { ArcadeButton } from "../components/arcade/ArcadeButton";
+import { ArcadePanel } from "../components/arcade/ArcadePanel";
 
 // SCAFFOLD: standings are static sample data standing in for the Supabase
 // leaderboard query + Realtime subscription (see agent build spec, backend
@@ -20,7 +22,7 @@ export function LeaderboardScreen() {
 
   return (
     <div className="mx-auto w-full max-w-2xl">
-      <div className="arcade-box overflow-hidden p-0">
+      <ArcadePanel className="overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between border-b-4 border-ink bg-tertiary-fixed px-4 py-3">
           <h1 className="flex items-center gap-2 font-display text-2xl font-black uppercase text-ink">
@@ -65,16 +67,12 @@ export function LeaderboardScreen() {
         </div>
 
         <div className="border-t-4 border-ink p-3">
-          <button
-            type="button"
-            disabled
-            className="arcade-btn flex w-full items-center justify-center gap-2 bg-primary py-3 uppercase text-white"
-          >
+          <ArcadeButton variant="primary" size="lg" disabled className="w-full">
             <Icon name="refresh" size={22} />
             Refresh Standings
-          </button>
+          </ArcadeButton>
         </div>
-      </div>
+      </ArcadePanel>
     </div>
   );
 }

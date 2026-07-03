@@ -1,4 +1,4 @@
-import type { AffinityMatrix } from "../types";
+import type { AffinityMatrix, Flavor } from "../types";
 import { Decimal } from "../lib/decimal";
 import { formatCurry } from "../lib/format";
 import { computeRecipeScore } from "./recipeEngine";
@@ -16,6 +16,7 @@ export interface ClickResult {
 export interface ClickMods {
   specialMultiplier: number; // 1, or 2 when both special ingredients are slotted
   streakMultiplier: number; // ≥ 1, from the active recipe streak
+  craving?: Flavor; // today's craving; matching flavour bumps value, mismatch caps legendary
 }
 
 export const NO_MODS: ClickMods = { specialMultiplier: 1, streakMultiplier: 1 };
@@ -40,18 +41,20 @@ export function computeClickValue(
 ): Decimal {
   const score = computeRecipeScore(slots, matrix, {
     spicePairBonus: effects.spicePairAffinityBonus,
+    craving: mods.craving,
   });
   if (score.baseValue === 0) return new Decimal(0);
 
   const tandoorBonus = effects.spiceClickBonusPerSpice * countSpices(slots);
 
   return new Decimal(score.baseValue)
-    .mul(score.multiplier)
+    .mul(score.effectiveMultiplier)
     .mul(effects.clickMultiplier)
     .add(effects.decorationClickBonus)
     .add(tandoorBonus)
     .mul(mods.streakMultiplier)
     .mul(mods.specialMultiplier)
+    .mul(effects.globalMultiplier)
     .floor();
 }
 

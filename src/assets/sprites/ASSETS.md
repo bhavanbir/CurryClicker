@@ -36,4 +36,8 @@ No component code changes — `Sprite.tsx` is format- and size-agnostic.
 
 - `props.svg` — 4×1 @16px: `[0]` table, `[1]` plant, `[2]` door, `[3]` window.
 - `curry.svg` — 2×1 @16px: `[0]` red curry bowl, `[1]` yellow curry + rice.
-- `customer.svg` — 3×1 @16px: `[0]` idle/seated, `[1]` walk-A, `[2]` walk-B.
+- `customer.svg` — 3×4 @16px: 4 rows = palette variants (skin/hair/outfit),
+  columns per row = `[idle, walk-A, walk-B]`. Frame index = `row * 3 + col`;
+  use `customerAnim(variant)` from `manifest.ts` rather than raw indices.
+  The SVG defines the frames once and re-tints each row via CSS custom
+  properties on the row `<g>` — a real PNG sheet just needs the same 3×4 grid.

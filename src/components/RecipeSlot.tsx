@@ -29,7 +29,7 @@ export function RecipeSlot({ index, ingredientId, locked, onClick }: Props) {
       }`}
       title={ingredient ? `Remove ${ingredient.name}` : "Empty slot"}
     >
-      <span className="absolute left-1 top-1 text-[10px] font-bold text-ink/40">
+      <span className="absolute left-1 top-1 text-[10px] font-bold text-ink/55">
         {index + 1}
       </span>
       {ingredient ? (

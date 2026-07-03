@@ -27,7 +27,7 @@ export function ScoreDisplay({ showHighScore = true }: Props) {
         {text}
       </motion.span>
       {showHighScore && (
-        <span className="mt-0.5 text-[10px] font-bold uppercase tracking-widest text-ink/45">
+        <span className="mt-0.5 text-[10px] font-bold uppercase tracking-widest text-ink/55">
           High {formatScore(highScore)}
         </span>
       )}

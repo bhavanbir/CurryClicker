@@ -2,8 +2,9 @@
 // weekly_seeds table; for the MVP we derive it locally from the ISO week so
 // the affinity matrix is still shared by anyone playing the same calendar week.
 
-import type { DailySpecial, DailySnapshot, RecipeTier } from "../types";
-import { INGREDIENT_IDS } from "./ingredients";
+import type { DailySpecial, DailySnapshot, Flavor, RecipeTier } from "../types";
+import { FLAVORS, BASE_INGREDIENT_IDS } from "./ingredients";
+import { IS_DEMO, DEMO_LOCKED_INGREDIENT_SET } from "../target";
 import { makeRng } from "../lib/rng";
 
 export function getCurrentWeekId(d: Date = new Date()): string {
@@ -39,7 +40,9 @@ export const SPECIAL_BONUS_MULTIPLIER = 2.0;
 
 export function getDailySpecial(day: number, seed: number): DailySpecial {
   const rng = makeRng(`${seed}-special-day${day}`);
-  const ids = INGREDIENT_IDS;
+  const ids = IS_DEMO
+    ? BASE_INGREDIENT_IDS.filter((id) => !DEMO_LOCKED_INGREDIENT_SET.has(id))
+    : BASE_INGREDIENT_IDS;
   const a = ids[Math.floor(rng() * ids.length)];
   let b = ids[Math.floor(rng() * ids.length)];
   while (b === a) b = ids[Math.floor(rng() * ids.length)];
@@ -49,6 +52,14 @@ export function getDailySpecial(day: number, seed: number): DailySpecial {
     ingredientB: b,
     bonusMultiplier: SPECIAL_BONUS_MULTIPLIER,
   };
+}
+
+// Daily Craving: one flavour the town wants today, deterministic per (seed, day)
+// so it changes daily and reshuffles when the weekly seed rolls over. A recipe
+// whose flavour matches earns a bonus; a mismatch caps legendary at great.
+export function getDailyCraving(day: number, seed: number): Flavor {
+  const rng = makeRng(`${seed}-craving-day${day}`);
+  return FLAVORS[Math.floor(rng() * FLAVORS.length)];
 }
 
 // Recipe Streak (framework §9): consecutive days ending at tier good+ build a

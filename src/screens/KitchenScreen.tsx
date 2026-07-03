@@ -2,14 +2,21 @@ import { useMemo, useState, type ReactNode } from "react";
 import { useGameStore } from "../store/useGameStore";
 import { useRecipeScore } from "../hooks/useRecipeScore";
 import { getAffinityData } from "../engine/affinityEngine";
+import { getDailyCraving } from "../engine/weekEngine";
 import { CATEGORIES, INGREDIENT_LIST, INGREDIENTS } from "../engine/ingredients";
+import { unlockedIngredientIds } from "../engine/franchiseData";
+import { IS_DEMO, DEMO_LOCKED_INGREDIENT_SET } from "../target";
 import type { Ingredient } from "../types";
 import type { Screen } from "../navigation";
 import { AffinityBadge } from "../components/AffinityBadge";
+import { FlavorTag } from "../components/FlavorTag";
 import { RecipeSlot } from "../components/RecipeSlot";
 import { IngredientCard } from "../components/IngredientCard";
 import { CookbookModal } from "../components/CookbookModal";
 import { Icon } from "../components/arcade/Icon";
+import { PageHeader } from "../components/arcade/PageHeader";
+import { ArcadeButton } from "../components/arcade/ArcadeButton";
+import { ArcadePanel } from "../components/arcade/ArcadePanel";
 
 interface Props {
   onNavigate: (s: Screen) => void;
@@ -20,55 +27,65 @@ type Filter = "all" | Ingredient["category"];
 export function KitchenScreen({ onNavigate }: Props) {
   const slots = useGameStore((s) => s.slots);
   const seed = useGameStore((s) => s.seed);
+  const currentDay = useGameStore((s) => s.currentDay);
   const unlockedSlots = useGameStore((s) => s.unlockedSlots);
-  const affinityLens = useGameStore((s) => s.affinityLens);
   const discoveredCount = useGameStore((s) => Object.keys(s.discoveredRecipes).length);
+  const franchiseUpgrades = useGameStore((s) => s.franchiseUpgrades);
   const setIngredient = useGameStore((s) => s.setIngredient);
   const toggleIngredient = useGameStore((s) => s.toggleIngredient);
   const clearRecipe = useGameStore((s) => s.clearRecipe);
 
   const score = useRecipeScore();
   const { matrix } = getAffinityData(seed);
+  const craving = getDailyCraving(currentDay, seed);
 
   const [filter, setFilter] = useState<Filter>("all");
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [cookbookOpen, setCookbookOpen] = useState(false);
 
-  const visible = useMemo(
-    () =>
+  const unlockedIds = useMemo(() => {
+    const ids = unlockedIngredientIds(franchiseUpgrades);
+    return new Set(
+      IS_DEMO ? ids.filter((id) => !DEMO_LOCKED_INGREDIENT_SET.has(id)) : ids,
+    );
+  }, [franchiseUpgrades]);
+
+  const visible = useMemo(() => {
+    const list =
       filter === "all"
         ? INGREDIENT_LIST
-        : INGREDIENT_LIST.filter((i) => i.category === filter),
-    [filter],
-  );
+        : INGREDIENT_LIST.filter((i) => i.category === filter);
+    return [...list].sort(
+      (a, b) => Number(!unlockedIds.has(a.id)) - Number(!unlockedIds.has(b.id)),
+    );
+  }, [filter, unlockedIds]);
 
   const filledCount = slots.filter(Boolean).length;
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">
-      {/* Title */}
-      <div className="relative text-center">
-        <h1 className="font-display text-3xl font-black uppercase text-ink text-stroke-ink md:text-4xl">
-          Kitchen
-        </h1>
-        <p className="mt-1 text-sm font-semibold text-ink/55">
-          Combine ingredients to discover curry recipes!
-        </p>
-        <button
-          type="button"
-          onClick={() => setCookbookOpen(true)}
-          className="arcade-btn absolute right-0 top-0 flex items-center gap-1.5 bg-white px-3 py-2 text-sm uppercase text-ink"
-        >
-          <Icon name="menu_book" fill size={18} className="text-primary" />
-          <span className="hidden sm:inline">Cookbook</span>
-          <span className="rounded border-2 border-ink bg-tertiary-fixed px-1 text-xs font-black">
-            {discoveredCount}
-          </span>
-        </button>
-      </div>
+      <PageHeader
+        title="Kitchen"
+        subtitle="Combine ingredients to discover curry recipes!"
+        leading={
+          <ArcadeButton size="sm" onClick={() => onNavigate("journal")}>
+            <Icon name="science" fill size={18} className="text-primary" />
+            <span className="hidden sm:inline">Journal</span>
+          </ArcadeButton>
+        }
+        trailing={
+          <ArcadeButton size="sm" onClick={() => setCookbookOpen(true)}>
+            <Icon name="menu_book" fill size={18} className="text-primary" />
+            <span className="hidden sm:inline">Cookbook</span>
+            <span className="rounded border-2 border-ink bg-tertiary-fixed px-1 text-xs font-black">
+              {discoveredCount}
+            </span>
+          </ArcadeButton>
+        }
+      />
 
       {/* Crafting station */}
-      <section className="arcade-box p-4 md:p-6">
+      <ArcadePanel as="section" className="p-4 md:p-6">
         <div className="flex flex-col items-center gap-4 md:flex-row md:justify-between">
           <div className="flex flex-wrap items-center justify-center gap-2 md:gap-3">
             {slots.map((id, i) => (
@@ -83,32 +100,30 @@ export function KitchenScreen({ onNavigate }: Props) {
           </div>
 
           <div className="flex flex-col items-center gap-3">
-            <AffinityBadge tier={score.tier} multiplier={score.multiplier} />
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <AffinityBadge tier={score.tier} multiplier={score.multiplier} />
+              <FlavorTag flavor={score.flavor} craving={craving} tier={score.tier} />
+            </div>
             <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={clearRecipe}
-                disabled={filledCount === 0}
-                className="arcade-btn bg-white px-3 py-2 text-sm uppercase text-ink"
-              >
+              <ArcadeButton size="sm" onClick={clearRecipe} disabled={filledCount === 0}>
                 <Icon name="delete" size={18} />
                 Clear
-              </button>
-              <button
-                type="button"
+              </ArcadeButton>
+              <ArcadeButton
+                variant="primary"
+                className="text-sm"
                 onClick={() => onNavigate("gameplay")}
                 disabled={filledCount === 0}
-                className="arcade-btn bg-primary px-4 py-2 text-sm uppercase text-white"
               >
                 <Icon name="local_fire_department" fill size={18} />
                 Cook It
-              </button>
+              </ArcadeButton>
             </div>
           </div>
         </div>
         {/* Reserve the line's height always so hovering doesn't shift the pantry. */}
         <p
-          className={`mt-3 min-h-4 text-center text-xs font-semibold text-ink/45 transition-opacity ${
+          className={`mt-3 min-h-4 text-center text-xs font-semibold text-ink/55 transition-opacity ${
             hoveredId && filledCount > 0 ? "opacity-100" : "opacity-0"
           }`}
           aria-hidden={!(hoveredId && filledCount > 0)}
@@ -117,14 +132,14 @@ export function KitchenScreen({ onNavigate }: Props) {
             ? `Glowing slots show how ${INGREDIENTS[hoveredId]?.name} pairs with your recipe`
             : " "}
         </p>
-      </section>
+      </ArcadePanel>
 
       {/* Pantry */}
       <section>
         <div className="mb-3 flex items-end justify-between border-b-4 border-ink pb-1">
           <h2 className="font-display text-xl font-black uppercase text-ink">Pantry</h2>
           <span className="rounded border-2 border-ink bg-white px-2 py-0.5 text-xs font-bold text-ink/60">
-            30 Items
+            {unlockedIds.size} Items
           </span>
         </div>
 
@@ -149,11 +164,14 @@ export function KitchenScreen({ onNavigate }: Props) {
               key={ingredient.id}
               ingredient={ingredient}
               inRecipe={slots.includes(ingredient.id)}
+              locked={!unlockedIds.has(ingredient.id)}
+              steamLocked={IS_DEMO && !unlockedIds.has(ingredient.id)}
               slots={slots}
               hoveredId={hoveredId}
               matrix={matrix}
-              lens={affinityLens}
-              onClick={() => toggleIngredient(ingredient.id)}
+              onClick={() => {
+                if (unlockedIds.has(ingredient.id)) toggleIngredient(ingredient.id);
+              }}
               onHover={setHoveredId}
             />
           ))}

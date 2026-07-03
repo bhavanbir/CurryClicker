@@ -18,5 +18,5 @@ export function computeAutoProduction(
   const { multiplier } = computeRecipeScore(slots, matrix, {
     spicePairBonus: effects.spicePairAffinityBonus,
   });
-  return new Decimal(cps).mul(multiplier);
+  return new Decimal(cps).mul(multiplier).mul(effects.globalMultiplier);
 }

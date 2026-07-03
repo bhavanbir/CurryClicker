@@ -2,7 +2,11 @@
 // the click/auto pipelines consume. Pure: same inputs → same output.
 
 import { UPGRADE_MAP, DECORATION_MAP } from "./shopData";
+import { franchiseBaseSlots, reputationMultiplier } from "./franchiseData";
 import { BASE_UNLOCKED_SLOTS, MAX_SLOTS } from "../config";
+import { IS_DEMO, DEMO_MAX_SLOTS } from "../target";
+
+const SLOT_CAP = IS_DEMO ? DEMO_MAX_SLOTS : MAX_SLOTS;
 
 export interface ActiveEffects {
   clickMultiplier: number; // product of click_multiplier upgrades
@@ -12,17 +16,19 @@ export interface ActiveEffects {
   unlockedSlots: number; // base + recipe_slot_unlock upgrades
   spicePairAffinityBonus: number; // flat affinity added to spice/spice pairs
   spiceClickBonusPerSpice: number; // flat cook value per spice ingredient
-  affinityLens: boolean; // reveals pairwise affinity values in the Kitchen
+  expansionLevel: number; // 0–5: restaurant size (tables + customer flow)
+  globalMultiplier: number; // franchise Reputation ×curry, applied to all earnings
 }
 
 export function computeEffects(
   purchasedUpgrades: string[],
   ownedDecorations: Record<string, number>,
+  franchiseUpgrades: string[] = [],
 ): ActiveEffects {
   let clickMultiplier = 1;
   let autoCPS = 0;
-  let unlockedSlots = BASE_UNLOCKED_SLOTS;
-  let affinityLens = false;
+  let unlockedSlots = franchiseBaseSlots(franchiseUpgrades);
+  let expansionLevel = 0;
 
   for (const id of purchasedUpgrades) {
     const eff = UPGRADE_MAP[id]?.effect;
@@ -37,8 +43,8 @@ export function computeEffects(
       case "recipe_slot_unlock":
         unlockedSlots = Math.max(unlockedSlots, eff.slotIndex + 1);
         break;
-      case "affinity_lens":
-        affinityLens = true;
+      case "restaurant_expansion":
+        expansionLevel = Math.max(expansionLevel, eff.level);
         break;
     }
   }
@@ -64,10 +70,11 @@ export function computeEffects(
     decorationClickBonus,
     decorationCPS,
     autoCPS,
-    unlockedSlots: Math.min(unlockedSlots, MAX_SLOTS),
+    unlockedSlots: Math.min(unlockedSlots, SLOT_CAP),
     spicePairAffinityBonus,
     spiceClickBonusPerSpice,
-    affinityLens,
+    expansionLevel,
+    globalMultiplier: reputationMultiplier(franchiseUpgrades),
   };
 }
 
@@ -79,5 +86,6 @@ export const NO_EFFECTS: ActiveEffects = {
   unlockedSlots: BASE_UNLOCKED_SLOTS,
   spicePairAffinityBonus: 0,
   spiceClickBonusPerSpice: 0,
-  affinityLens: false,
+  expansionLevel: 0,
+  globalMultiplier: 1,
 };

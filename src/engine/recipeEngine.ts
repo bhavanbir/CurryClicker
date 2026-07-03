@@ -1,4 +1,10 @@
-import type { AffinityMatrix, PairScore, RecipeScore, RecipeTier } from "../types";
+import type {
+  AffinityMatrix,
+  Flavor,
+  PairScore,
+  RecipeScore,
+  RecipeTier,
+} from "../types";
 import { INGREDIENTS } from "./ingredients";
 
 // [avgAffinity threshold, multiplier] — walked top-down to pick the multiplier.
@@ -28,9 +34,57 @@ export const TIER_ORDER: Record<RecipeTier, number> = {
   legendary: 5,
 };
 
+// Multiplier each tier lands on (mirrors MULTIPLIER_CURVE); used to recompute the
+// multiplier when a mismatched craving caps the tier down to `great`.
+export const TIER_MULTIPLIER: Record<RecipeTier, number> = {
+  none: 1,
+  terrible: 0.5,
+  neutral: 1.0,
+  good: 1.5,
+  great: 2.25,
+  legendary: 3.5,
+};
+
+// When the recipe's flavour matches today's craving, cook value gets this bump.
+// Deliberately smaller than the Daily Special's 2× since it's easier to hit.
+export const CRAVING_MATCH_BONUS = 1.35;
+
+// Most-common flavour among the slotted ingredients. Ties (incl. an empty recipe)
+// resolve to `unique`; a single ingredient keeps its own flavour. Returns null
+// only when nothing is slotted.
+export function computeRecipeFlavor(slots: (string | null)[]): Flavor | null {
+  const flavors = slots
+    .map((s) => (s ? INGREDIENTS[s]?.flavor : undefined))
+    .filter((f): f is Flavor => f !== undefined);
+
+  if (flavors.length === 0) return null;
+
+  const counts = new Map<Flavor, number>();
+  for (const f of flavors) counts.set(f, (counts.get(f) ?? 0) + 1);
+
+  let best: Flavor | null = null;
+  let bestCount = 0;
+  let tied = false;
+  for (const [flavor, count] of counts) {
+    if (count > bestCount) {
+      best = flavor;
+      bestCount = count;
+      tied = false;
+    } else if (count === bestCount) {
+      tied = true;
+    }
+  }
+
+  return tied ? "unique" : best;
+}
+
 export interface ScoreOptions {
   // Flat affinity added to every spice/spice pair (Spice Rack Deluxe decoration).
   spicePairBonus?: number;
+  // Today's craving. When set, a matching recipe flavour earns CRAVING_MATCH_BONUS
+  // and a mismatched legendary is capped down to `great` (effective* fields only;
+  // the raw tier/multiplier are always preserved).
+  craving?: Flavor;
 }
 
 export function computeRecipeScore(
@@ -39,6 +93,7 @@ export function computeRecipeScore(
   opts: ScoreOptions = {},
 ): RecipeScore {
   const spicePairBonus = opts.spicePairBonus ?? 0;
+  const craving = opts.craving;
   const ids = slots.filter((s): s is string => s !== null);
 
   if (ids.length === 0) {
@@ -49,6 +104,10 @@ export function computeRecipeScore(
       tier: "none",
       baseValue: 0,
       pairBreakdown: [],
+      flavor: null,
+      effectiveTier: "none",
+      effectiveMultiplier: 1,
+      cravingMatched: craving ? false : null,
     };
   }
 
@@ -90,6 +149,22 @@ export function computeRecipeScore(
 
   const tier: RecipeTier = pairCount > 0 ? avgAffinityToTier(avgAffinity) : "neutral";
 
+  const flavor = computeRecipeFlavor(slots);
+
+  let effectiveTier = tier;
+  let effectiveMultiplier = multiplier;
+  let cravingMatched: boolean | null = null;
+  if (craving) {
+    cravingMatched = flavor === craving;
+    if (cravingMatched) {
+      effectiveMultiplier = multiplier * CRAVING_MATCH_BONUS;
+    } else if (tier === "legendary") {
+      // Off-craving legendaries still cook well, just not top-tier.
+      effectiveTier = "great";
+      effectiveMultiplier = TIER_MULTIPLIER.great;
+    }
+  }
+
   return {
     affinityScore: totalAffinity,
     avgAffinity,
@@ -97,5 +172,9 @@ export function computeRecipeScore(
     tier,
     baseValue,
     pairBreakdown,
+    flavor,
+    effectiveTier,
+    effectiveMultiplier,
+    cravingMatched,
   };
 }

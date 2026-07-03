@@ -5,6 +5,7 @@ import { useRecipeScore } from "../hooks/useRecipeScore";
 import { TIER_ORDER } from "../engine/recipeEngine";
 import type { RecipeTier } from "../types";
 import { TierDiscoveryOverlay } from "./TierDiscoveryOverlay";
+import { playDiscovery } from "../lib/sfx";
 
 const CELEBRATED: RecipeTier[] = ["good", "great", "legendary"];
 
@@ -21,7 +22,10 @@ export function RewardsLayer() {
       CELEBRATED.includes(score.tier) &&
       TIER_ORDER[score.tier] > TIER_ORDER[highestTierSeen]
     ) {
-      if (noteTierSeen(score.tier)) setDiscovery(score.tier);
+      if (noteTierSeen(score.tier)) {
+        setDiscovery(score.tier);
+        playDiscovery(score.tier as "good" | "great" | "legendary");
+      }
     }
   }, [score.tier, highestTierSeen, noteTierSeen]);
 

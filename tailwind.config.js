@@ -35,6 +35,18 @@ export default {
           great: "#d97706",
           legendary: "#b45309",
         },
+        flavor: {
+          spicy: "#ef4444",
+          mild: "#0ea5e9",
+          sweet: "#ec4899",
+          savory: "#d97706",
+          unique: "#a855f7",
+        },
+        rarity: {
+          common: "#d6d3d1",
+          uncommon: "#38bdf8",
+          rare: "#d946ef",
+        },
       },
       fontFamily: {
         display: ["Montserrat", "system-ui", "sans-serif"],

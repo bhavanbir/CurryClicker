@@ -1,6 +1,6 @@
 # Restaurant Scene Redesign — Progress Report
 
-_Last updated: 2026-06-27_
+_Last updated: 2026-06-29 — Phases 2–4 complete (build green)._
 
 A dynamic, pixel-art curry restaurant scene viewed **POV from above the
 counter**: you look down over the counter out into the dining room, click to
@@ -65,21 +65,35 @@ and `src/screens/GameplayScreen.tsx` repointed to `../scene/RestaurantScene`.
 
 ---
 
-## What's next
+## What's built (Phases 2–4 — DONE, build green)
 
-- **Phase 2 — Customers (next up):** customer FSM + spawn director. Diner
-  behavior (door → seat → eat → leave), plus "hang out" and "counter" variants.
-  Make customers **pick up curry off the counter** so the filled counter becomes
-  a living loop (frees slots). `customer.svg` + `CUSTOMER_ANIM` already exist;
-  `TABLES` already carry seat offsets. New: `useCustomerDirector` hook + a
-  `Customer` component, grid pathing around tables.
-- **Phase 3 — Décor drag-to-place:** the Store sells décor (`engine/shopData.ts`,
-  `ownedDecorations` in the store) but it's invisible in the scene. Add a
-  `decorationPlacements` persisted slice (persist **v2 → v3** + non-destructive
-  migration), an edit-mode tray + drag/drop snapping to the floor grid, and a
-  `DecorationLayer`.
-- **Phase 4 — Polish:** restaurant skins (wire `SceneBackdrop` `skin` prop +
-  Store "Restaurant Skins"), customer mood faces, reduced-motion + perf pass.
+- **Phase 2 — Customers:** `hooks/useCustomerDirector.ts` runs the spawn loop +
+  FSM (`entering → eating → leaving`); `scene/Customer.tsx` renders each diner,
+  tweening between door and seat with Framer Motion and the `CUSTOMER_ANIM`
+  walk/idle frames. Diners **consume a dish off the counter** (a dish is reserved
+  at spawn via `consumeDish`, so the counter drains as the room fills — closing
+  the cook→serve loop). Capped at 6 concurrent; seats pulled from `TABLES`.
+- **Phase 3 — Décor placement:** persisted `decorationPlacements` slice + persist
+  **v2 → v3** with a non-destructive `migrate` (old saves gain empty placements +
+  default skin). `scene/SceneEditor.tsx` is the in-scene **Decorate** mode: pick
+  an owned decoration from the tray → tap a floor cell to drop it (snapped to the
+  `projectCell` grid); tap a placed item to pick it up. `scene/DecorationLayer.tsx`
+  renders them depth-scaled. Owned-vs-placed counts are enforced in the store.
+  (Chose robust **tap/click-to-place** over free drag — reliable on the trapezoid
+  floor and on mobile.)
+- **Phase 4 — Polish:** `scene/skins.ts` holds 4 skins (Curry House / Neon Night
+  / Zen Garden / Rooftop Mumbai); `SceneBackdrop` + `Counter` honour the active
+  skin, swappable from the Decorate panel and persisted as `activeSkin`.
+  Customers show **mood faces** (hungry → eating → happy). Reduced-motion is
+  respected end-to-end (Sprite already; director shortens walks, `Customer`
+  drops tweens).
+
+## What's next (optional)
+
+- Swap placeholder SVG sheets for real Kenney CC0 art (drop-in per `ASSETS.md`).
+- "Hang out / at-counter" customer variants; queueing when all seats are full.
+- Free-drag repositioning of placed décor (current model is tap-to-place/remove).
+- IAP skin store (gate premium skins behind entitlements in the full build).
 
 ---
 

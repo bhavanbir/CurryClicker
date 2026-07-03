@@ -1,9 +1,12 @@
-import type { AffinityMatrix, Ingredient } from "../types";
+import type { AffinityMatrix, Ingredient, IngredientSet } from "../types";
+import { FRANCHISE_UPGRADES } from "../engine/franchiseData";
 import { Icon } from "./arcade/Icon";
 
 interface Props {
   ingredient: Ingredient;
   inRecipe: boolean;
+  locked?: boolean; // franchise set not yet unlocked
+  steamLocked?: boolean; // demo build: only in the full game
   slots: (string | null)[];
   hoveredId: string | null;
   matrix: AffinityMatrix;
@@ -12,10 +15,16 @@ interface Props {
   onHover: (id: string | null) => void;
 }
 
+const SET_NAME: Partial<Record<IngredientSet, string>> = Object.fromEntries(
+  FRANCHISE_UPGRADES.flatMap((u) =>
+    u.effect.type === "ingredient_set" ? [[u.effect.set, u.name]] : [],
+  ),
+);
+
 const RARITY_DOT: Record<Ingredient["rarity"], string> = {
-  common: "bg-stone-300",
-  uncommon: "bg-sky-400",
-  rare: "bg-fuchsia-500",
+  common: "bg-rarity-common",
+  uncommon: "bg-rarity-uncommon",
+  rare: "bg-rarity-rare",
 };
 
 // Hot/Cold aura: when a pantry card is hovered, cards already IN the recipe glow
@@ -39,6 +48,8 @@ function auraRing(
 export function IngredientCard({
   ingredient,
   inRecipe,
+  locked = false,
+  steamLocked = false,
   slots,
   hoveredId,
   matrix,
@@ -46,7 +57,37 @@ export function IngredientCard({
   onClick,
   onHover,
 }: Props) {
-  const aura = auraRing(ingredient.id, hoveredId, slots, matrix);
+  const aura = locked ? "" : auraRing(ingredient.id, hoveredId, slots, matrix);
+  const setName = ingredient.set ? SET_NAME[ingredient.set] : undefined;
+
+  if (locked) {
+    return (
+      <div
+        title={
+          steamLocked
+            ? "Locked — available in the full game on Steam"
+            : setName
+              ? `Locked — unlock with the ${setName} (Franchise)`
+              : "Locked"
+        }
+        className="relative flex aspect-square cursor-not-allowed flex-col items-center justify-center gap-1 rounded-xl border-4 border-dashed border-ink/40 bg-cream-50 p-1.5 opacity-70"
+      >
+        <Icon
+          name={ingredient.icon}
+          className={`${ingredient.color} opacity-50 grayscale`}
+          fill
+          size={30}
+        />
+        <span className="w-full truncate px-0.5 text-center text-[11px] font-bold leading-tight text-ink/50">
+          {ingredient.name}
+        </span>
+        <span className="flex items-center gap-0.5 text-[9px] font-black uppercase leading-tight text-ink/50">
+          <Icon name="lock" fill size={10} />
+          {steamLocked ? "Steam" : (setName ?? "Locked")}
+        </span>
+      </div>
+    );
+  }
 
   // Affinity Lens: exact pair value shown on an in-recipe card while hovering
   // another pantry item.
@@ -73,7 +114,7 @@ export function IngredientCard({
       <span className="w-full truncate px-0.5 text-center text-[11px] font-bold leading-tight text-ink">
         {ingredient.name}
       </span>
-      <span className="text-[10px] font-bold text-ink/45">+{ingredient.baseValue}</span>
+      <span className="text-[10px] font-bold text-ink/55">+{ingredient.baseValue}</span>
       {inRecipe && lensValue === null && (
         <span className="absolute inset-0 z-10 flex items-center justify-center bg-ink/10 text-[10px] font-extrabold uppercase tracking-wide text-ink">
           In Use

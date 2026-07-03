@@ -1,9 +1,13 @@
 import { useGameStore } from "../store/useGameStore";
 import { DAYS_PER_WEEK } from "../config";
+import { IS_DEMO } from "../target";
 
 export function DayProgressBar() {
   const currentDay = useGameStore((s) => s.currentDay);
   const dayProgress = useGameStore((s) => s.dayProgress);
+  const dayStarted = useGameStore((s) => s.dayStarted);
+  const weeksCompleted = useGameStore((s) => s.weeksCompleted);
+  const demoEnded = IS_DEMO && weeksCompleted >= 1;
 
   return (
     <div className="w-full">
@@ -11,7 +15,13 @@ export function DayProgressBar() {
         <span>
           Day {currentDay}/{DAYS_PER_WEEK}
         </span>
-        <span>{Math.floor(dayProgress * 100)}%</span>
+        <span className={dayStarted ? "" : "text-primary"}>
+          {dayStarted
+            ? `${Math.floor(dayProgress * 100)}%`
+            : demoEnded
+              ? "Demo complete"
+              : "Ready — press Start Day"}
+        </span>
       </div>
       <div className="h-3 w-full overflow-hidden rounded-full border-2 border-ink bg-white">
         <div

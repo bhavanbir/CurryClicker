@@ -1,8 +1,14 @@
 import { useGameStore } from "../store/useGameStore";
 import { formatCurry } from "../lib/format";
 import { BADGES } from "../engine/badges";
+import { franchiseRankFor } from "../engine/franchiseData";
 import type { Screen } from "../navigation";
 import { Icon } from "../components/arcade/Icon";
+import { PageHeader } from "../components/arcade/PageHeader";
+import { ArcadeButton } from "../components/arcade/ArcadeButton";
+import { ArcadePanel } from "../components/arcade/ArcadePanel";
+import { IS_DEMO } from "../target";
+import { SteamCta } from "../components/SteamCta";
 
 interface Props {
   onNavigate: (s: Screen) => void;
@@ -17,44 +23,61 @@ export function ProfileScreen({ onNavigate }: Props) {
   const currentDay = useGameStore((s) => s.currentDay);
   const unlockedBadges = useGameStore((s) => s.unlockedBadges);
   const recipesFound = useGameStore((s) => Object.keys(s.discoveredRecipes).length);
+  const franchiseStarsEarned = useGameStore((s) => s.franchiseStarsEarned);
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
       {/* Avatar */}
-      <div className="flex flex-col items-center">
+      <div className="flex flex-col items-center gap-2">
         <div className="flex h-24 w-24 items-center justify-center rounded-full border-4 border-ink bg-gradient-to-tr from-primary to-tertiary shadow-arcade">
           <Icon name="account_circle" fill size={64} className="text-white" />
         </div>
-        <h1 className="mt-2 font-display text-2xl font-black uppercase text-ink">
-          Guest Chef
-        </h1>
-        <p className="text-sm font-bold text-primary">Rising Star</p>
+        <PageHeader title="Guest Chef" subtitle={franchiseRankFor(franchiseStarsEarned)} />
       </div>
 
-      {/* Account CTA */}
-      <button
-        type="button"
-        onClick={() => onNavigate("login")}
-        className="arcade-btn flex items-center justify-center gap-2 bg-primary py-3 uppercase text-white"
-      >
-        <Icon name="login" size={22} />
-        Sign in to save &amp; compete
-      </button>
+      {/* Account CTA. In the offline demo there are no accounts — point players
+          to the full game on Steam instead. */}
+      {IS_DEMO ? (
+        <SteamCta label="Get the full game on Steam" />
+      ) : (
+        <ArcadeButton variant="primary" size="lg" onClick={() => onNavigate("login")}>
+          <Icon name="login" size={22} />
+          Sign in to save &amp; compete
+        </ArcadeButton>
+      )}
 
       {/* Stats */}
       <section className="grid grid-cols-2 gap-3">
-        <div className="arcade-box col-span-2 flex flex-col items-center p-4">
+        <ArcadePanel className="col-span-2 flex flex-col items-center p-4">
           <span className="text-xs font-black uppercase tracking-wider text-ink/60">
             Total Curry Made
           </span>
           <span className="font-display text-4xl font-black text-primary text-stroke-ink">
             {formatCurry(totalCurry, 1)}
           </span>
-        </div>
+        </ArcadePanel>
         <Stat icon="military_tech" value={formatCurry(highScore, 1)} label="High Score" />
         <Stat icon="touch_app" value={clicksThisWeek.toLocaleString()} label="Cooks / Week" />
         <Stat icon="calendar_today" value={`${currentDay}/7`} label="Current Day" />
         <Stat icon="restaurant_menu" value={recipesFound.toString()} label="Recipes Found" />
+        <ArcadePanel shadow="md" className="flex flex-col items-start gap-1 p-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg border-2 border-ink bg-violet-100">
+            <Icon name="stars" fill size={18} className="text-violet-600" />
+          </div>
+          <span className="font-display text-xl font-black tabular-nums text-ink">
+            {franchiseStarsEarned.toLocaleString()}
+          </span>
+          <span className="text-xs font-bold text-ink/55">Lifetime Stars</span>
+        </ArcadePanel>
+        <ArcadeButton
+          className="h-full justify-center"
+          size="lg"
+          onClick={() => onNavigate("franchise")}
+        >
+          <Icon name="stars" fill size={22} className="text-violet-600" />
+          Franchise HQ
+          <Icon name="arrow_forward" size={20} />
+        </ArcadeButton>
       </section>
 
       {/* Badges */}
@@ -99,12 +122,12 @@ export function ProfileScreen({ onNavigate }: Props) {
 
 function Stat({ icon, value, label }: { icon: string; value: string; label: string }) {
   return (
-    <div className="arcade-box flex flex-col items-start gap-1 p-3" style={{ boxShadow: "4px 4px 0 0 #191c1e" }}>
+    <ArcadePanel shadow="md" className="flex flex-col items-start gap-1 p-3">
       <div className="flex h-8 w-8 items-center justify-center rounded-lg border-2 border-ink bg-tertiary-fixed">
         <Icon name={icon} fill size={18} className="text-primary" />
       </div>
       <span className="font-display text-xl font-black tabular-nums text-ink">{value}</span>
       <span className="text-xs font-bold text-ink/55">{label}</span>
-    </div>
+    </ArcadePanel>
   );
 }

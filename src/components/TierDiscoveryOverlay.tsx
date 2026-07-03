@@ -16,7 +16,7 @@ interface TierConfig {
 const TIER_CONFIG: Partial<Record<RecipeTier, TierConfig>> = {
   good: { label: "GOOD SYNERGY!", text: "text-green-600", overlay: "bg-buy/15", duration: 1000, particles: 8 },
   great: { label: "GREAT SYNERGY!", text: "text-primary", overlay: "bg-primary/15", duration: 1400, particles: 16 },
-  legendary: { label: "✨ LEGENDARY! ✨", text: "text-tertiary", overlay: "bg-tertiary/25", duration: 2200, particles: 28 },
+  legendary: { label: "✨ LEGENDARY! ✨", text: "text-tier-legendary", overlay: "bg-tertiary/25", duration: 2200, particles: 28 },
 };
 
 export function TierDiscoveryOverlay({

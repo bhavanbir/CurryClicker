@@ -1,5 +1,7 @@
 import { Sprite } from "./Sprite";
 import { PIXEL_SCALE, CURRY_VARIANTS } from "./manifest";
+import { SKINS } from "./skins";
+import type { SceneSkin } from "../types";
 
 // The foreground counter, seen from above — the player stands over it looking
 // out into the restaurant. Cooked curry piles onto its surface, filling a fixed
@@ -51,8 +53,9 @@ function slot(i: number): Slot {
 
 const SLAB_CLIP = `polygon(${BACK_L}% ${BACK_Y}%, ${BACK_R}% ${BACK_Y}%, ${FRONT_R}% ${FRONT_Y}%, ${FRONT_L}% ${FRONT_Y}%)`;
 
-export function Counter({ count }: { count: number }) {
+export function Counter({ count, skin = "default" }: { count: number; skin?: SceneSkin }) {
   const dishes = Math.min(count, COUNTER_CAPACITY);
+  const pal = SKINS[skin];
 
   return (
     <div className="pointer-events-none absolute inset-0">
@@ -62,7 +65,7 @@ export function Counter({ count }: { count: number }) {
         style={{
           zIndex: 2000,
           clipPath: SLAB_CLIP,
-          background: "linear-gradient(#e2913f, #c8772e)",
+          background: `linear-gradient(${pal.counterFrom}, ${pal.counterTo})`,
         }}
       />
       {/* back edge line where the counter meets the floor */}

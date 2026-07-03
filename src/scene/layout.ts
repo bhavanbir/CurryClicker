@@ -13,17 +13,62 @@ export interface TableSpot {
   u: number;
   v: number;
   seats: Seat[];
+  minLevel: number; // appears once Restaurant Expansion reaches this level (0 = base)
 }
 
-// Two back-row tables + three front-row tables, staggered so none fully
-// occludes another.
-export const TABLES: TableSpot[] = [
-  { u: 0.34, v: 0.30, seats: [{ du: -0.07, dv: 0 }, { du: 0.07, dv: 0 }] },
-  { u: 0.66, v: 0.30, seats: [{ du: -0.07, dv: 0 }, { du: 0.07, dv: 0 }] },
-  { u: 0.2, v: 0.6, seats: [{ du: -0.08, dv: 0.02 }, { du: 0.08, dv: 0.02 }] },
-  { u: 0.5, v: 0.62, seats: [{ du: -0.08, dv: 0.02 }, { du: 0.08, dv: 0.02 }] },
-  { u: 0.82, v: 0.6, seats: [{ du: -0.08, dv: 0.02 }, { du: 0.08, dv: 0.02 }] },
+const pair = (du = 0.06, dv = 0): Seat[] => [
+  { du: -du, dv },
+  { du, dv },
 ];
+
+const tbl = (u: number, v: number, minLevel: number, dv = 0): TableSpot => ({
+  u,
+  v,
+  seats: pair(0.06, dv),
+  minLevel,
+});
+
+// A clean, evenly spaced dining room laid out on 3 rows (back / mid / front) and
+// 5 columns. The base room shows 5 tables; each Restaurant Expansion level adds
+// a symmetric pair (a centre table arrives last), so the room fills out neatly.
+export const ALL_TABLES: TableSpot[] = [
+  // base room (level 0): 2 back + 3 front
+  tbl(0.35, 0.33, 0),
+  tbl(0.65, 0.33, 0),
+  tbl(0.2, 0.67, 0, 0.02),
+  tbl(0.5, 0.67, 0, 0.02),
+  tbl(0.8, 0.67, 0, 0.02),
+  // level 1 (+2): inner mid pair
+  tbl(0.35, 0.5, 1),
+  tbl(0.65, 0.5, 1),
+  // level 2 (+2): outer mid pair
+  tbl(0.2, 0.5, 2),
+  tbl(0.8, 0.5, 2),
+  // level 3 (+2): outer back pair
+  tbl(0.2, 0.33, 3),
+  tbl(0.8, 0.33, 3),
+  // level 4 (+2): inner front pair
+  tbl(0.35, 0.67, 4, 0.02),
+  tbl(0.65, 0.67, 4, 0.02),
+  // level 5 (+2): centre mid + centre back
+  tbl(0.5, 0.5, 5),
+  tbl(0.5, 0.33, 5),
+];
+
+// Base tables only — the default room when no expansion is owned.
+export const TABLES: TableSpot[] = ALL_TABLES.filter((t) => t.minLevel === 0);
+
+/** Tables visible at a given expansion level (0–5). */
+export function tablesForLevel(level: number): TableSpot[] {
+  return ALL_TABLES.filter((t) => t.minLevel <= level);
+}
+
+/** Absolute (u,v) seat coordinates for every table visible at a level. */
+export function seatsForLevel(level: number): { u: number; v: number }[] {
+  return tablesForLevel(level).flatMap((t) =>
+    t.seats.map((s) => ({ u: t.u + s.du, v: t.v + s.dv })),
+  );
+}
 
 // Corner plants on the floor.
 export const PLANTS: { u: number; v: number }[] = [

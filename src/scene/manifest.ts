@@ -12,7 +12,7 @@ import curryUrl from "../assets/sprites/curry.svg";
 export const PIXEL_SCALE = 3;
 
 const PROPS: SpriteSheet = { src: propsUrl, frameW: 16, frameH: 16, columns: 4, rows: 1 };
-const CUSTOMER: SpriteSheet = { src: customerUrl, frameW: 16, frameH: 16, columns: 3, rows: 1 };
+const CUSTOMER: SpriteSheet = { src: customerUrl, frameW: 16, frameH: 16, columns: 3, rows: 4 };
 const CURRY: SpriteSheet = { src: curryUrl, frameW: 16, frameH: 16, columns: 2, rows: 1 };
 
 export interface SpriteAnim {
@@ -35,8 +35,14 @@ export const CURRY_VARIANTS: SpriteAnim[] = [
   { sheet: CURRY, frames: [1], fps: 0 },
 ];
 
-// Customer — idle/seated, and a 2-frame walk cycle (used in Phase 2).
-export const CUSTOMER_ANIM = {
-  idle: { sheet: CUSTOMER, frames: [0], fps: 0 },
-  walk: { sheet: CUSTOMER, frames: [1, 2], fps: 6 },
-} satisfies Record<string, SpriteAnim>;
+// Customer — 4 palette variants (sheet rows), each with an idle/seated frame
+// and a 2-frame walk cycle. Pick a stable variant per customer (e.g. id % 4).
+export const CUSTOMER_VARIANTS = CUSTOMER.rows;
+
+export function customerAnim(variant: number): { idle: SpriteAnim; walk: SpriteAnim } {
+  const base = (Math.abs(variant) % CUSTOMER_VARIANTS) * CUSTOMER.columns;
+  return {
+    idle: { sheet: CUSTOMER, frames: [base], fps: 0 },
+    walk: { sheet: CUSTOMER, frames: [base + 1, base + 2], fps: 6 },
+  };
+}

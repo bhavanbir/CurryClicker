@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useGameStore } from "../store/useGameStore";
 import { Decimal } from "../lib/decimal";
 import { formatCurry } from "../lib/format";
@@ -6,6 +7,13 @@ import { UPGRADES, DECORATIONS } from "../engine/shopData";
 import { COSMETICS } from "../data/sampleData";
 import type { Upgrade, Decoration } from "../types";
 import { Icon } from "../components/arcade/Icon";
+import { StatChip } from "../components/arcade/StatChip";
+import { PageHeader } from "../components/arcade/PageHeader";
+import { ArcadeButton } from "../components/arcade/ArcadeButton";
+import { ArcadePanel } from "../components/arcade/ArcadePanel";
+import { playPurchase } from "../lib/sfx";
+import { IS_DEMO, DEMO_DECORATIONS } from "../target";
+import { SteamLockChip } from "../components/SteamCta";
 
 // Live store (WU-B3): upgrades + decorations buy with curry and apply
 // immediately; cosmetics remain an inert IAP preview until Epic E.
@@ -18,17 +26,12 @@ export function StoreScreen() {
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="font-display text-3xl font-black uppercase text-ink text-stroke-ink">
-          Store
-        </h1>
-        <div className="flex items-center gap-1.5 rounded-lg border-2 border-ink bg-tertiary-fixed px-3 py-1.5 shadow-arcade-sm">
-          <Icon name="star" className="text-primary" fill size={18} />
-          <span className="font-display font-black tabular-nums">
-            {formatCurry(currentCurry, 1)}
-          </span>
-        </div>
-      </div>
+      <PageHeader
+        title="Store"
+        trailing={
+          <StatChip icon="star" label="Curry" value={formatCurry(currentCurry, 1)} />
+        }
+      />
 
       {/* Upgrades */}
       <Section title="Upgrades">
@@ -37,16 +40,23 @@ export function StoreScreen() {
           const prereqMet =
             !u.prerequisiteUpgradeId ||
             purchasedUpgrades.includes(u.prerequisiteUpgradeId);
-          const affordable = currentCurry.gte(new Decimal(u.cost));
           return (
             <ShopRow
               key={u.id}
               item={u}
-              statusLabel={owned ? "Owned" : !prereqMet ? "Locked" : undefined}
-              disabled={owned || !prereqMet || !affordable}
-              dimmed={owned}
+              statusLabel={owned ? "Owned" : undefined}
+              owned={owned}
+              locked={!owned && !prereqMet}
+              steamLocked={IS_DEMO && u.id === "slot_5"}
               cost={u.cost}
-              onBuy={() => purchaseUpgrade(u.id)}
+              currentCurry={currentCurry}
+              onBuy={() => {
+                if (purchaseUpgrade(u.id)) {
+                  playPurchase();
+                  return true;
+                }
+                return false;
+              }}
             />
           );
         })}
@@ -57,7 +67,6 @@ export function StoreScreen() {
         {DECORATIONS.map((d) => {
           const qty = ownedDecorations[d.id] ?? 0;
           const maxed = qty >= d.maxQuantity;
-          const affordable = currentCurry.gte(new Decimal(d.cost));
           const level =
             d.maxQuantity > 1 ? `${qty}/${d.maxQuantity}` : qty > 0 ? "Owned" : undefined;
           return (
@@ -65,16 +74,25 @@ export function StoreScreen() {
               key={d.id}
               item={d}
               statusLabel={maxed ? (d.maxQuantity > 1 ? "Maxed" : "Owned") : level}
-              disabled={maxed || !affordable}
-              dimmed={maxed}
+              owned={maxed}
+              steamLocked={IS_DEMO && !DEMO_DECORATIONS.includes(d.id)}
               cost={d.cost}
-              onBuy={() => purchaseDecoration(d.id)}
+              currentCurry={currentCurry}
+              onBuy={() => {
+                if (purchaseDecoration(d.id)) {
+                  playPurchase();
+                  return true;
+                }
+                return false;
+              }}
             />
           );
         })}
       </Section>
 
-      {/* Cosmetics (IAP preview — Epic E) */}
+      {/* Cosmetics (IAP preview — Epic E). Hidden in the demo: no real-money
+          store in the offline "try the mechanics" build. */}
+      {!IS_DEMO && (
       <section>
         <div className="mb-3 flex items-center gap-2">
           <h2 className="inline-block border-b-4 border-ink pb-0.5 font-display text-xl font-black uppercase">
@@ -86,10 +104,10 @@ export function StoreScreen() {
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           {COSMETICS.map((item) => (
-            <div
+            <ArcadePanel
               key={item.id}
-              className="arcade-box flex items-center justify-between gap-3 p-3 opacity-80"
-              style={{ boxShadow: "4px 4px 0 0 #191c1e" }}
+              shadow="md"
+              className="flex items-center justify-between gap-3 p-3 opacity-80"
             >
               <div className="flex items-center gap-3">
                 <div className={`flex h-14 w-14 items-center justify-center rounded-md border-2 border-ink ${item.tone}`}>
@@ -102,13 +120,14 @@ export function StoreScreen() {
                   <p className="text-xs font-semibold text-ink/55">{item.desc}</p>
                 </div>
               </div>
-              <button type="button" disabled className="arcade-btn shrink-0 bg-buy px-3 py-2 text-sm text-ink">
+              <ArcadeButton variant="buy" size="sm" disabled className="shrink-0">
                 {item.cost}
-              </button>
-            </div>
+              </ArcadeButton>
+            </ArcadePanel>
           ))}
         </div>
       </section>
+      )}
     </div>
   );
 }
@@ -128,25 +147,44 @@ function ShopRow({
   item,
   cost,
   statusLabel,
-  disabled,
-  dimmed,
+  owned,
+  locked = false,
+  steamLocked = false,
+  currentCurry,
   onBuy,
 }: {
   item: Upgrade | Decoration;
   cost: number;
   statusLabel?: string;
-  disabled: boolean;
-  dimmed: boolean;
-  onBuy: () => void;
+  owned: boolean;
+  locked?: boolean;
+  steamLocked?: boolean;
+  currentCurry: Decimal;
+  onBuy: () => boolean;
 }) {
+  const [justBought, setJustBought] = useState(false);
+  locked = locked || steamLocked;
+  const affordable = currentCurry.gte(new Decimal(cost));
+  const buyable = !owned && !locked && affordable;
+  const shortfall = new Decimal(cost).sub(currentCurry);
+
+  const handleBuy = () => {
+    if (!onBuy()) return;
+    setJustBought(true);
+    window.setTimeout(() => setJustBought(false), 450);
+  };
+
   return (
-    <div
-      className={`arcade-box flex items-center justify-between gap-3 p-3 ${dimmed ? "opacity-60" : ""}`}
-      style={{ boxShadow: "4px 4px 0 0 #191c1e" }}
+    <motion.div
+      animate={justBought ? { scale: [1, 1.04, 1] } : { scale: 1 }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
+      className={`arcade-box flex items-center justify-between gap-3 p-3 shadow-arcade ${owned ? "opacity-60" : ""}`}
     >
       <div className="flex items-center gap-3">
-        <div className={`flex h-14 w-14 items-center justify-center rounded-md border-2 border-ink ${item.tone}`}>
-          <Icon name={item.icon} className="text-ink" fill size={28} />
+        <div
+          className={`flex h-14 w-14 items-center justify-center rounded-md border-2 border-ink ${item.tone} ${locked ? "opacity-60 grayscale" : ""}`}
+        >
+          <Icon name={locked ? "lock" : item.icon} className="text-ink" fill size={28} />
         </div>
         <div>
           <h3 className="font-display text-base font-extrabold leading-tight text-ink">
@@ -156,21 +194,59 @@ function ShopRow({
         </div>
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1">
-        {statusLabel && (
-          <span className="rounded border-2 border-ink bg-buy/30 px-1.5 py-0.5 text-[10px] font-black uppercase text-ink">
-            {statusLabel}
+        {steamLocked ? (
+          <SteamLockChip />
+        ) : locked ? (
+          <span className="flex items-center gap-0.5 rounded border-2 border-dashed border-ink/40 bg-cream-50 px-1.5 py-0.5 text-[10px] font-black uppercase text-ink/55">
+            <Icon name="lock" fill size={11} />
+            Locked
+          </span>
+        ) : (
+          statusLabel && (
+            <span className="rounded border-2 border-ink bg-buy/30 px-1.5 py-0.5 text-[10px] font-black uppercase text-ink">
+              {statusLabel}
+            </span>
+          )
+        )}
+        <div className="relative">
+          <button
+            type="button"
+            disabled={!buyable}
+            onClick={handleBuy}
+            className={`arcade-btn flex items-center gap-1 px-3 py-2 text-sm ${
+              !owned && !locked && !affordable
+                ? "bg-cream-50 text-ink/60 disabled:opacity-100"
+                : "bg-primary text-white"
+            }`}
+          >
+            <Icon
+              name="star"
+              fill
+              size={14}
+              className={buyable || owned || locked ? "text-white/90" : "text-ink/40"}
+            />
+            {formatCurry(new Decimal(cost), 0)}
+          </button>
+          <AnimatePresence>
+            {justBought && (
+              <motion.span
+                initial={{ opacity: 0, scale: 0.4 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 1.3 }}
+                transition={{ duration: 0.18, ease: "easeOut" }}
+                className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-lg border-4 border-ink bg-buy"
+              >
+                <Icon name="check" fill size={18} className="text-ink" />
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </div>
+        {!owned && !locked && !affordable && (
+          <span className="text-[10px] font-bold uppercase tracking-wide text-ink/50">
+            Need {formatCurry(shortfall, 0)} more
           </span>
         )}
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={onBuy}
-          className="arcade-btn flex items-center gap-1 bg-primary px-3 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <Icon name="star" fill size={14} className="text-white/90" />
-          {formatCurry(new Decimal(cost), 0)}
-        </button>
       </div>
-    </div>
+    </motion.div>
   );
 }

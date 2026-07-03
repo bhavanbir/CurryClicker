@@ -4,19 +4,25 @@ import { useGameStore } from "../store/useGameStore";
 import { useRecipeScore, useEffects } from "../hooks/useRecipeScore";
 import { getAffinityData } from "../engine/affinityEngine";
 import { handleClick, type ClickMods } from "../engine/clickEngine";
-import { getDailySpecial } from "../engine/weekEngine";
+import { getDailySpecial, getDailyCraving } from "../engine/weekEngine";
 import { INGREDIENTS } from "../engine/ingredients";
 import { formatCurry } from "../lib/format";
+import { playCook } from "../lib/sfx";
 import type { Screen } from "../navigation";
 import { ScoreDisplay } from "../components/ScoreDisplay";
 import { DayProgressBar } from "../components/DayProgressBar";
 import { AffinityBadge } from "../components/AffinityBadge";
 import { RestaurantScene } from "../scene/RestaurantScene";
 import { FloatText, type Float } from "../components/FloatText";
-import { DailySpecialBanner } from "../components/DailySpecialBanner";
+import { TodayStrip } from "../components/TodayStrip";
+import { FlavorTag } from "../components/FlavorTag";
 import { RecipeNamingModal } from "../components/RecipeNamingModal";
 import { StatChip } from "../components/arcade/StatChip";
 import { Icon } from "../components/arcade/Icon";
+import { ArcadeButton } from "../components/arcade/ArcadeButton";
+import { ArcadePanel } from "../components/arcade/ArcadePanel";
+import { IS_DEMO } from "../target";
+import { SteamCta } from "../components/SteamCta";
 
 interface Props {
   onNavigate: (s: Screen) => void;
@@ -34,6 +40,15 @@ export function GameplayScreen({ onNavigate }: Props) {
   const registerClick = useGameStore((s) => s.registerClick);
   const claimSpecial = useGameStore((s) => s.claimSpecial);
   const logCook = useGameStore((s) => s.logCook);
+  const dayStarted = useGameStore((s) => s.dayStarted);
+  const startDay = useGameStore((s) => s.startDay);
+  const weeksCompleted = useGameStore((s) => s.weeksCompleted);
+  const totalCurryAllTime = useGameStore((s) => s.totalCurryAllTime);
+  const highestTierSeen = useGameStore((s) => s.highestTierSeen);
+  const lastWeekStars = useGameStore((s) => s.lastWeekStars);
+  const franchiseStarsEarned = useGameStore((s) => s.franchiseStarsEarned);
+
+  const demoEnded = IS_DEMO && weeksCompleted >= 1;
 
   const score = useRecipeScore();
   const effects = useEffects();
@@ -48,15 +63,17 @@ export function GameplayScreen({ onNavigate }: Props) {
   const special = getDailySpecial(currentDay, seed);
   const specialActive =
     slots.includes(special.ingredientA) && slots.includes(special.ingredientB);
+  const craving = getDailyCraving(currentDay, seed);
   const mods: ClickMods = {
     specialMultiplier: specialActive ? special.bonusMultiplier : 1,
     streakMultiplier: streakMult,
+    craving,
   };
 
   const perCook = handleClick(slots, getAffinityData(seed).matrix, effects, mods).value;
 
   function cook(x: number, y: number) {
-    if (!hasRecipe) return;
+    if (!hasRecipe || !dayStarted) return; // shop is closed until the day opens
     const { value, floatLabel, isSpecial } = handleClick(
       slots,
       getAffinityData(seed).matrix,
@@ -67,6 +84,7 @@ export function GameplayScreen({ onNavigate }: Props) {
 
     addCurry(value);
     registerClick();
+    playCook();
     if (isSpecial) claimSpecial(currentDay);
     const outcome = logCook(slots);
     if (outcome.needsNaming) setNamingFp(outcome.fingerprint);
@@ -99,11 +117,16 @@ export function GameplayScreen({ onNavigate }: Props) {
 
       <DayProgressBar />
 
-      <DailySpecialBanner onMixIn={() => onNavigate("kitchen")} />
+      <TodayStrip onMixIn={() => onNavigate("kitchen")} />
 
       {/* Restaurant scene + floats */}
       <div ref={sceneWrapRef} className="relative">
-        <RestaurantScene cookSignal={cookSignal} onCook={cook} busy={hasRecipe} />
+        <RestaurantScene
+          cookSignal={cookSignal}
+          onCook={cook}
+          busy={hasRecipe && dayStarted}
+          cravingMatched={score.cravingMatched ?? false}
+        />
         <AnimatePresence>
           {floats.map((f) => (
             <FloatText key={f.id} x={f.x} y={f.y} label={f.label} />
@@ -112,7 +135,48 @@ export function GameplayScreen({ onNavigate }: Props) {
       </div>
 
       {/* Active recipe bar */}
-      <div className="arcade-box flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+      {demoEnded ? (
+        <ArcadePanel className="flex flex-col gap-4 p-5">
+          <div className="flex items-center gap-2">
+            <Icon name="emoji_events" fill size={30} className="text-tertiary" />
+            <h2 className="font-display text-xl font-black uppercase text-ink">
+              That's the demo!
+            </h2>
+          </div>
+          <p className="text-sm font-semibold text-ink/70">
+            Week 2's fresh affinity matrix is already waiting in your Kitchen —
+            the full game lets you chase it week after week, with 45 ingredients,
+            the 5th slot, skins, and the whole Franchise catalog.
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            <DemoStat
+              icon="star"
+              label="Curry all-time"
+              value={formatCurry(totalCurryAllTime, 1)}
+            />
+            <DemoStat
+              icon="restaurant"
+              label="Best tier"
+              value={
+                lastWeekStars?.reasons.some((r) => r.includes("Legendary"))
+                  ? "Legendary"
+                  : lastWeekStars?.reasons.some((r) => r.includes("Great"))
+                    ? "Great"
+                    : highestTierSeen !== "none"
+                      ? highestTierSeen
+                      : "—"
+              }
+            />
+            <DemoStat
+              icon="stars"
+              label="Stars earned"
+              value={franchiseStarsEarned.toLocaleString()}
+            />
+          </div>
+          <SteamCta label="Get the full game on Steam" />
+        </ArcadePanel>
+      ) : (
+      <ArcadePanel className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
         {hasRecipe ? (
           <>
             <div className="flex flex-col gap-2">
@@ -134,8 +198,9 @@ export function GameplayScreen({ onNavigate }: Props) {
                   <Icon name="edit" size={18} />
                 </button>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <AffinityBadge tier={score.tier} multiplier={score.multiplier} />
+                <FlavorTag flavor={score.flavor} craving={craving} tier={score.tier} />
                 <span className="text-sm font-bold text-ink/60">
                   +{formatCurry(perCook)} / cook
                 </span>
@@ -149,31 +214,64 @@ export function GameplayScreen({ onNavigate }: Props) {
           </div>
         )}
 
-        {/* COOK button */}
-        <button
-          type="button"
-          onClick={hasRecipe ? cookFromButton : () => onNavigate("kitchen")}
-          className={`arcade-btn flex items-center justify-center gap-2 px-8 py-4 font-display text-2xl uppercase text-white ${
-            hasRecipe ? "bg-primary" : "bg-tertiary text-ink"
-          }`}
+        {/* Primary action: build a recipe → open the day → cook. The day clock
+            only starts when the player presses Start Day. */}
+        <ArcadeButton
+          size="xl"
+          variant={!hasRecipe ? "tertiary" : !dayStarted ? "buy" : "primary"}
+          onClick={
+            !hasRecipe
+              ? () => onNavigate("kitchen")
+              : !dayStarted
+                ? startDay
+                : cookFromButton
+          }
         >
-          {hasRecipe ? (
-            <>
-              <Icon name="local_fire_department" fill size={28} />
-              Cook!
-            </>
-          ) : (
+          {!hasRecipe ? (
             <>
               <Icon name="skillet" fill size={26} />
               Open Kitchen
             </>
+          ) : !dayStarted ? (
+            <>
+              <Icon name="play_arrow" fill size={28} />
+              Start Day {currentDay}
+            </>
+          ) : (
+            <>
+              <Icon name="local_fire_department" fill size={28} />
+              Cook!
+            </>
           )}
-        </button>
-      </div>
+        </ArcadeButton>
+      </ArcadePanel>
+      )}
 
       {namingFp && (
         <RecipeNamingModal fingerprint={namingFp} onClose={() => setNamingFp(null)} />
       )}
+    </div>
+  );
+}
+
+function DemoStat({
+  icon,
+  label,
+  value,
+}: {
+  icon: string;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-0.5 rounded-lg border-2 border-ink bg-cream-100 px-2 py-2 text-center">
+      <Icon name={icon} fill size={18} className="text-primary" />
+      <span className="font-display text-sm font-black capitalize text-ink">
+        {value}
+      </span>
+      <span className="text-[9px] font-black uppercase tracking-wide text-ink/50">
+        {label}
+      </span>
     </div>
   );
 }

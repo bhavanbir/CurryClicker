@@ -2,6 +2,7 @@ import { useGameStore } from "../../store/useGameStore";
 import { formatCurry } from "../../lib/format";
 import { PRIMARY_NAV, type Screen } from "../../navigation";
 import { Icon } from "../arcade/Icon";
+import { IS_DEMO } from "../../target";
 
 interface Props {
   screen: Screen;
@@ -26,6 +27,11 @@ export function TopBar({ screen, onNavigate }: Props) {
           <span className="hidden font-display text-lg font-black uppercase tracking-tight text-ink sm:inline">
             Curry Clicker
           </span>
+          {IS_DEMO && (
+            <span className="rounded-full border-2 border-ink bg-tertiary px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-ink">
+              Demo
+            </span>
+          )}
         </button>
 
         {/* Desktop nav */}

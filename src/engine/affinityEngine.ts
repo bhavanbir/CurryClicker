@@ -1,6 +1,6 @@
 import type { AffinityData, AffinityMatrix } from "../types";
 import { makeRng } from "../lib/rng";
-import { INGREDIENT_IDS } from "./ingredients";
+import { INGREDIENT_IDS, BASE_INGREDIENT_IDS } from "./ingredients";
 import { GUARANTEED_RECIPE_COUNT } from "../config";
 
 // Deterministically builds the full weekly affinity matrix plus a set of
@@ -28,9 +28,10 @@ export function buildAffinityData(seed: number): AffinityData {
   }
 
   // Step 2: carve out guaranteed positive recipes by forcing all pairs in a
-  // combo to be strongly positive.
+  // combo to be strongly positive. Drawn from the base roster only so week-1
+  // players (no franchise sets) can always find these combos.
   const guaranteed: string[][] = [];
-  const shuffled = shuffle([...INGREDIENT_IDS], rng);
+  const shuffled = shuffle([...BASE_INGREDIENT_IDS], rng);
   let pool = [...shuffled];
 
   while (guaranteed.length < GUARANTEED_RECIPE_COUNT && pool.length >= 3) {
@@ -59,6 +60,12 @@ function shuffle<T>(arr: T[], rng: () => number): T[] {
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr;
+}
+
+// Order-free key for a pair of ingredients — used by the Affinity Journal to
+// record which pairs the player has tested this week.
+export function affinityPairKey(a: string, b: string): string {
+  return a < b ? `${a}|${b}` : `${b}|${a}`;
 }
 
 // Memoised accessor — the matrix only changes when the weekly seed changes.

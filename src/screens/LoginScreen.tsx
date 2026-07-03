@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from "react";
 import type { Screen } from "../navigation";
 import { Icon } from "../components/arcade/Icon";
+import { ArcadeButton } from "../components/arcade/ArcadeButton";
+import { ArcadePanel } from "../components/arcade/ArcadePanel";
 
 interface Props {
   onNavigate: (s: Screen) => void;
@@ -33,7 +35,7 @@ export function LoginScreen({ onNavigate }: Props) {
         <Icon name="arrow_back" size={20} /> Back
       </button>
 
-      <div className="arcade-box p-6">
+      <ArcadePanel className="p-6">
         <h1 className="text-center font-display text-2xl font-black uppercase text-ink">
           {mode === "login" ? "Welcome Back, Chef" : "Create Your Kitchen"}
         </h1>
@@ -94,14 +96,11 @@ export function LoginScreen({ onNavigate }: Props) {
             </p>
           )}
 
-          <button
-            type="submit"
-            className="arcade-btn mt-1 bg-primary py-3 uppercase text-white"
-          >
+          <ArcadeButton type="submit" variant="primary" size="lg" className="mt-1">
             {mode === "login" ? "Sign In" : "Create Account"}
-          </button>
+          </ArcadeButton>
         </form>
-      </div>
+      </ArcadePanel>
     </div>
   );
 }
