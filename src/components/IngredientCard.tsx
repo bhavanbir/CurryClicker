@@ -1,6 +1,7 @@
 import type { AffinityMatrix, Ingredient, IngredientSet } from "../types";
 import { FRANCHISE_UPGRADES } from "../engine/franchiseData";
 import { Icon } from "./arcade/Icon";
+import { PixelIcon } from "./PixelIcon";
 
 interface Props {
   ingredient: Ingredient;
@@ -110,7 +111,7 @@ export function IngredientCard({
       <span
         className={`absolute right-1.5 top-1.5 h-2 w-2 rounded-full border border-ink ${RARITY_DOT[ingredient.rarity]}`}
       />
-      <Icon name={ingredient.icon} className={ingredient.color} fill size={30} />
+      <PixelIcon id={ingredient.id} icon={ingredient.icon} size={32} iconClassName={ingredient.color} />
       <span className="w-full truncate px-0.5 text-center text-[11px] font-bold leading-tight text-ink">
         {ingredient.name}
       </span>

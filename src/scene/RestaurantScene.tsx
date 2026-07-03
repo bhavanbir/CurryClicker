@@ -91,7 +91,7 @@ export function RestaurantScene({
       /* `isolate` confines the scene's large internal z-indexes (counter/sign/
          editor use 2000–4000) to their own stacking context, so they never
          paint over page-level modals like the onboarding/week-summary overlays. */
-      className="arcade-box relative isolate h-[240px] w-full cursor-pointer select-none overflow-hidden sm:h-[300px] md:h-[340px] lg:h-[380px]"
+      className="arcade-box relative isolate h-[240px] w-full cursor-pointer select-none overflow-hidden sm:h-[300px] md:h-[340px] lg:h-[380px] xl:h-[420px]"
     >
       <SceneBackdrop skin={activeSkin} />
 

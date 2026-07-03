@@ -8,7 +8,6 @@ import { TopBar } from "./components/shell/TopBar";
 import { BottomNav } from "./components/shell/BottomNav";
 import { GameplayScreen } from "./screens/GameplayScreen";
 import { KitchenScreen } from "./screens/KitchenScreen";
-import { StoreScreen } from "./screens/StoreScreen";
 import { LeaderboardScreen } from "./screens/LeaderboardScreen";
 import { ProfileScreen } from "./screens/ProfileScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
@@ -18,6 +17,7 @@ import { FranchiseScreen } from "./screens/FranchiseScreen";
 import { WeekSummaryModal } from "./components/WeekSummaryModal";
 import { RewardsLayer } from "./components/RewardsLayer";
 import { ShopNotifier } from "./components/ShopNotifier";
+import { ShopDrawer } from "./components/ShopDrawer";
 import { Onboarding } from "./components/Onboarding";
 import {
   setSfxEnabled,
@@ -38,6 +38,7 @@ export default function App() {
   const musicVolume = useGameStore((s) => s.musicVolume);
   const hasOnboarded = useGameStore((s) => s.hasOnboarded);
   const [screen, setScreen] = useState<Screen>("gameplay");
+  const [shopOpen, setShopOpen] = useState(false);
   const reduced = useReducedMotion() ?? false;
 
   // Keep the sound engine in sync with the settings.
@@ -55,9 +56,17 @@ export default function App() {
 
   return (
     <div className="min-h-[100dvh] w-full">
-      <TopBar screen={visibleScreen} onNavigate={setScreen} />
+      <TopBar
+        screen={visibleScreen}
+        onNavigate={setScreen}
+        onOpenShop={() => setShopOpen(true)}
+      />
 
-      <main className="mx-auto w-full max-w-container px-3 pb-28 pt-[72px] sm:px-4 md:pb-8">
+      <main
+        className={`mx-auto w-full max-w-container px-3 pb-28 pt-[72px] transition-[padding] duration-300 sm:px-4 md:pb-8 ${
+          shopOpen ? "md:pr-[416px]" : ""
+        }`}
+      >
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={visibleScreen}
@@ -72,7 +81,6 @@ export default function App() {
           >
             {visibleScreen === "gameplay" && <GameplayScreen onNavigate={setScreen} />}
             {visibleScreen === "kitchen" && <KitchenScreen onNavigate={setScreen} />}
-            {visibleScreen === "store" && <StoreScreen />}
             {visibleScreen === "leaderboard" && !IS_DEMO && <LeaderboardScreen />}
             {visibleScreen === "profile" && <ProfileScreen onNavigate={setScreen} />}
             {visibleScreen === "settings" && <SettingsScreen onNavigate={setScreen} />}
@@ -83,11 +91,20 @@ export default function App() {
         </AnimatePresence>
       </main>
 
-      <BottomNav screen={visibleScreen} onNavigate={setScreen} />
+      <BottomNav
+        screen={visibleScreen}
+        onNavigate={setScreen}
+        onOpenShop={() => setShopOpen(true)}
+      />
 
       {phase === "week_summary" && <WeekSummaryModal onNavigate={setScreen} />}
       <RewardsLayer />
-      <ShopNotifier onNavigate={setScreen} />
+      <ShopDrawer
+        open={shopOpen}
+        onOpen={() => setShopOpen(true)}
+        onClose={() => setShopOpen(false)}
+      />
+      {!shopOpen && <ShopNotifier onOpenShop={() => setShopOpen(true)} />}
       {!hasOnboarded && <Onboarding />}
     </div>
   );

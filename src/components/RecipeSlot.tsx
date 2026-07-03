@@ -1,5 +1,6 @@
 import { INGREDIENTS } from "../engine/ingredients";
 import { Icon } from "./arcade/Icon";
+import { PixelIcon } from "./PixelIcon";
 
 interface Props {
   index: number; // 0-based slot index (shown as 1-based)
@@ -34,7 +35,7 @@ export function RecipeSlot({ index, ingredientId, locked, onClick }: Props) {
       </span>
       {ingredient ? (
         <>
-          <Icon name={ingredient.icon} className={ingredient.color} fill size={34} />
+          <PixelIcon id={ingredient.id} icon={ingredient.icon} size={32} iconClassName={ingredient.color} />
           <span className="mt-0.5 max-w-full truncate px-1 text-[10px] font-bold text-ink">
             {ingredient.name}
           </span>

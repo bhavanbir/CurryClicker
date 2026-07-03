@@ -1,7 +1,6 @@
 export type Screen =
   | "gameplay"
   | "kitchen"
-  | "store"
   | "leaderboard"
   | "profile"
   | "settings"
@@ -20,7 +19,6 @@ import { IS_DEMO } from "./target";
 const ALL_NAV: NavItem[] = [
   { screen: "gameplay", label: "Cook", icon: "soup_kitchen" },
   { screen: "kitchen", label: "Kitchen", icon: "skillet" },
-  { screen: "store", label: "Store", icon: "storefront" },
   { screen: "leaderboard", label: "Ranks", icon: "leaderboard" },
   { screen: "profile", label: "Chef", icon: "account_circle" },
 ];

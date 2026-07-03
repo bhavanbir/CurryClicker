@@ -134,3 +134,34 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* Click FX — spice burst at the cursor (compositor-only CSS, cheap at 10 cps) */
+@keyframes spice-burst {
+  to {
+    transform: translate(var(--dx), var(--dy)) rotate(180deg) scale(0);
+    opacity: 0;
+  }
+}
+.spice-particle {
+  animation: spice-burst 0.45s ease-out forwards;
+}
+@keyframes spice-ring {
+  from {
+    transform: translate(-50%, -50%) scale(0.3);
+    opacity: 0.8;
+  }
+  to {
+    transform: translate(-50%, -50%) scale(1.6);
+    opacity: 0;
+  }
+}
+.spice-ring {
+  animation: spice-ring 0.35s ease-out forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .spice-particle,
+  .spice-ring {
+    animation: none;
+    opacity: 0;
+  }
+}

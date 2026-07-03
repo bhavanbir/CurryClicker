@@ -3,13 +3,15 @@ import { formatCurry } from "../../lib/format";
 import { PRIMARY_NAV, type Screen } from "../../navigation";
 import { Icon } from "../arcade/Icon";
 import { IS_DEMO } from "../../target";
+import logoUrl from "../../assets/logo.png";
 
 interface Props {
   screen: Screen;
   onNavigate: (s: Screen) => void;
+  onOpenShop: () => void;
 }
 
-export function TopBar({ screen, onNavigate }: Props) {
+export function TopBar({ screen, onNavigate, onOpenShop }: Props) {
   const currentCurry = useGameStore((s) => s.currentCurry);
 
   return (
@@ -21,9 +23,12 @@ export function TopBar({ screen, onNavigate }: Props) {
           onClick={() => onNavigate("gameplay")}
           className="flex items-center gap-2"
         >
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg border-2 border-ink bg-primary text-white shadow-arcade-sm">
-            <Icon name="ramen_dining" fill size={20} />
-          </span>
+          <img
+            src={logoUrl}
+            alt=""
+            draggable={false}
+            className="h-8 w-8 select-none rounded-lg border-2 border-ink shadow-arcade-sm [image-rendering:pixelated]"
+          />
           <span className="hidden font-display text-lg font-black uppercase tracking-tight text-ink sm:inline">
             Curry Clicker
           </span>
@@ -54,6 +59,15 @@ export function TopBar({ screen, onNavigate }: Props) {
               </button>
             );
           })}
+          {/* Store opens the shop drawer, not a route */}
+          <button
+            type="button"
+            onClick={onOpenShop}
+            className="flex items-center gap-1.5 rounded-lg border-2 border-transparent px-3 py-1.5 text-sm font-bold uppercase tracking-wide text-ink/70 transition-all hover:text-ink"
+          >
+            <Icon name="storefront" size={20} />
+            Store
+          </button>
         </nav>
 
         {/* Right: curry balance + settings */}

@@ -3,12 +3,11 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useGameStore } from "../store/useGameStore";
 import { Decimal } from "../lib/decimal";
 import { UPGRADES, DECORATIONS } from "../engine/shopData";
-import type { Screen } from "../navigation";
 import { Icon } from "./arcade/Icon";
 import { IS_DEMO, DEMO_DECORATIONS } from "../target";
 
 // Bottom-right toast that fires the first time the player can afford a new,
-// not-yet-owned shop item (upgrade or decoration). Tapping it opens the Store.
+// not-yet-owned shop item (upgrade or decoration). Tapping it opens the shop drawer.
 //
 // We "prime" the already-affordable set silently on mount so a returning player
 // isn't flooded — toasts only fire when a threshold is crossed during play.
@@ -23,7 +22,7 @@ interface Toast {
 const VISIBLE = 3; // cap stacked toasts
 const DISMISS_MS = 5000;
 
-export function ShopNotifier({ onNavigate }: { onNavigate: (s: Screen) => void }) {
+export function ShopNotifier({ onOpenShop }: { onOpenShop: () => void }) {
   const currentCurry = useGameStore((s) => s.currentCurry);
   const purchasedUpgrades = useGameStore((s) => s.purchasedUpgrades);
   const ownedDecorations = useGameStore((s) => s.ownedDecorations);
@@ -83,7 +82,7 @@ export function ShopNotifier({ onNavigate }: { onNavigate: (s: Screen) => void }
             exit={{ opacity: 0, x: 48, scale: 0.9 }}
             transition={{ type: "spring", damping: 20, stiffness: 260 }}
             onClick={() => {
-              onNavigate("store");
+              onOpenShop();
               setToasts((list) => list.filter((x) => x.key !== t.key));
             }}
             className="pointer-events-auto flex items-center gap-2 rounded-lg border-2 border-ink bg-cream px-3 py-2 shadow-arcade-sm"

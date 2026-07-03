@@ -1,12 +1,12 @@
 // Sprite-sheet manifest — the single place that knows which image holds which
-// frames. Everything points at placeholder SVG sheets on a 16px grid today; to
-// switch to real Kenney CC0 art, drop the PNGs in src/assets/sprites/, repoint
-// the `src` imports, and adjust frameW/H/columns/rows to the pack. See ASSETS.md.
+// frames. Points at the commissioned pixel-art PNGs (16px grid, see
+// src/assets/sprites/scene). To swap art, repoint the `src` imports and adjust
+// frameW/H/columns/rows to the pack. See ASSETS.md.
 
 import type { SpriteSheet } from "./Sprite";
-import propsUrl from "../assets/sprites/props.svg";
-import customerUrl from "../assets/sprites/customer.svg";
-import curryUrl from "../assets/sprites/curry.svg";
+import propsUrl from "../assets/sprites/scene/props.png";
+import customerUrl from "../assets/sprites/scene/customer.png";
+import curryUrl from "../assets/sprites/scene/curry.png";
 
 /** screen px drawn per source px — bumps all pixel art up to a chunky scale */
 export const PIXEL_SCALE = 3;

@@ -14,6 +14,8 @@ import { DayProgressBar } from "../components/DayProgressBar";
 import { AffinityBadge } from "../components/AffinityBadge";
 import { RestaurantScene } from "../scene/RestaurantScene";
 import { FloatText, type Float } from "../components/FloatText";
+import { ClickBurst } from "../components/ClickBurst";
+import { PixelIcon } from "../components/PixelIcon";
 import { TodayStrip } from "../components/TodayStrip";
 import { FlavorTag } from "../components/FlavorTag";
 import { RecipeNamingModal } from "../components/RecipeNamingModal";
@@ -92,13 +94,14 @@ export function GameplayScreen({ onNavigate }: Props) {
 
     const id = floatId++;
     const label = isSpecial ? `${floatLabel} ×2!` : floatLabel;
-    setFloats((f) => [...f, { id, x, y, label }]);
+    setFloats((f) => [...f, { id, x, y, label }].slice(-12)); // cap under mash
     window.setTimeout(() => setFloats((f) => f.filter((fl) => fl.id !== id)), 800);
   }
 
   function cookFromButton() {
     const rect = sceneWrapRef.current?.getBoundingClientRect();
-    if (rect) cook(rect.width / 2, rect.height * 0.45);
+    // jitter so mashing the button doesn't stack identical bursts
+    if (rect) cook(rect.width / 2 + (Math.random() * 48 - 24), rect.height * 0.45);
     else cook(0, 0);
   }
 
@@ -129,7 +132,10 @@ export function GameplayScreen({ onNavigate }: Props) {
         />
         <AnimatePresence>
           {floats.map((f) => (
-            <FloatText key={f.id} x={f.x} y={f.y} label={f.label} />
+            <div key={f.id}>
+              <ClickBurst x={f.x} y={f.y} />
+              <FloatText x={f.x} y={f.y} label={f.label} />
+            </div>
           ))}
         </AnimatePresence>
       </div>
@@ -184,9 +190,9 @@ export function GameplayScreen({ onNavigate }: Props) {
                 {filled.map((id, i) => (
                   <span
                     key={i}
-                    className="flex h-8 w-8 items-center justify-center rounded-md border-2 border-ink bg-white"
+                    className="flex h-9 w-9 items-center justify-center rounded-md border-2 border-ink bg-white"
                   >
-                    <Icon name={INGREDIENTS[id].icon} className={INGREDIENTS[id].color} fill size={20} />
+                    <PixelIcon id={id} icon={INGREDIENTS[id].icon} size={32} iconClassName={INGREDIENTS[id].color} />
                   </span>
                 ))}
                 <button

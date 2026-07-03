@@ -4,6 +4,7 @@ import { DECORATIONS } from "../engine/shopData";
 import { WALL_SLOTS } from "./walls";
 import { SKIN_ORDER, SKINS } from "./skins";
 import { Icon } from "../components/arcade/Icon";
+import { PixelIcon } from "../components/PixelIcon";
 import { IS_DEMO } from "../target";
 
 // In-scene "Decorate" mode: pick an owned decoration from the tray, then tap a
@@ -93,7 +94,7 @@ export function SceneEditor({ onClose }: { onClose: () => void }) {
                     isSel ? "ring-4 ring-primary" : ""
                   } disabled:opacity-40`}
                 >
-                  <Icon name={d.icon} fill size={24} className="text-ink" />
+                  <PixelIcon id={d.id} icon={d.icon} size={32} iconClassName="text-ink" />
                   <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full border-2 border-ink bg-white px-0.5 text-[9px] font-black text-ink">
                     {left}
                   </span>
