@@ -1,5 +1,5 @@
-import { useRef, useState } from "react";
-import { AnimatePresence } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useGameStore } from "../store/useGameStore";
 import { useRecipeScore, useEffects } from "../hooks/useRecipeScore";
 import { getAffinityData } from "../engine/affinityEngine";
@@ -25,6 +25,7 @@ import { ArcadeButton } from "../components/arcade/ArcadeButton";
 import { ArcadePanel } from "../components/arcade/ArcadePanel";
 import { IS_DEMO } from "../target";
 import { SteamCta } from "../components/SteamCta";
+import { useCrazyCurry } from "../hooks/useCrazyCurry";
 
 interface Props {
   onNavigate: (s: Screen) => void;
@@ -74,26 +75,28 @@ export function GameplayScreen({ onNavigate }: Props) {
 
   const perCook = handleClick(slots, getAffinityData(seed).matrix, effects, mods).value;
 
+  const crazy = useCrazyCurry(hasRecipe && dayStarted && !demoEnded);
+
   function cook(x: number, y: number) {
     if (!hasRecipe || !dayStarted) return; // shop is closed until the day opens
-    const { value, floatLabel, isSpecial } = handleClick(
-      slots,
-      getAffinityData(seed).matrix,
-      effects,
-      mods,
-    );
-    if (value.lte(0)) return;
+    const result = handleClick(slots, getAffinityData(seed).matrix, effects, mods);
+    if (result.value.lte(0)) return;
+
+    const crazyMult = crazy.registerCook();
+    const value = crazyMult > 1 ? result.value.mul(crazyMult) : result.value;
 
     addCurry(value);
     registerClick();
     playCook();
-    if (isSpecial) claimSpecial(currentDay);
+    if (result.isSpecial) claimSpecial(currentDay);
     const outcome = logCook(slots);
     if (outcome.needsNaming) setNamingFp(outcome.fingerprint);
     setCookSignal((n) => n + 1);
 
     const id = floatId++;
-    const label = isSpecial ? `${floatLabel} ×2!` : floatLabel;
+    let label = "+" + formatCurry(value);
+    if (crazyMult > 1) label += ` ×${crazyMult}!`;
+    else if (result.isSpecial) label += " ×2!";
     setFloats((f) => [...f, { id, x, y, label }].slice(-12)); // cap under mash
     window.setTimeout(() => setFloats((f) => f.filter((fl) => fl.id !== id)), 800);
   }
@@ -104,6 +107,30 @@ export function GameplayScreen({ onNavigate }: Props) {
     if (rect) cook(rect.width / 2 + (Math.random() * 48 - 24), rect.height * 0.45);
     else cook(0, 0);
   }
+
+  // Spacebar cooks — same guarded path as the Cook! button. Skips form fields
+  // and focused buttons so native keyboard behavior still works there.
+  const cookFromButtonRef = useRef(cookFromButton);
+  cookFromButtonRef.current = cookFromButton;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code !== "Space" || e.repeat) return;
+      const t = e.target as HTMLElement | null;
+      if (
+        t &&
+        (t.tagName === "INPUT" ||
+          t.tagName === "TEXTAREA" ||
+          t.tagName === "SELECT" ||
+          t.tagName === "BUTTON" ||
+          t.isContentEditable)
+      )
+        return;
+      e.preventDefault(); // no page scroll
+      cookFromButtonRef.current();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
@@ -138,6 +165,36 @@ export function GameplayScreen({ onNavigate }: Props) {
             </div>
           ))}
         </AnimatePresence>
+
+        {/* Crazy Curry banner — keep clicking above the floor for the bonus */}
+        {crazy.event && (
+          <motion.div
+            key={crazy.event.startedAt}
+            initial={{ y: -16, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className="pointer-events-none absolute left-1/2 top-10 z-40 w-max max-w-[90%] -translate-x-1/2 rounded-xl border-4 border-ink bg-curry-yellow px-4 py-2 text-center shadow-arcade"
+          >
+            <div className="flex items-center justify-center gap-1 font-display text-sm font-black uppercase tracking-wide text-ink">
+              <Icon name="local_fire_department" fill size={18} className="text-tier-terrible" />
+              Crazy Curry! Keep {crazy.event.floor}+ clicks/sec
+            </div>
+            <div
+              className={`text-xs font-black uppercase tracking-wide ${
+                crazy.onPace ? "text-tier-good" : "text-ink/60"
+              }`}
+            >
+              {crazy.onPace
+                ? `×${crazy.event.mult} bonus active!`
+                : `×${crazy.event.mult} if you keep the pace`}
+            </div>
+            <motion.div
+              className="mt-1 h-1.5 rounded-full bg-ink/80"
+              initial={{ width: "100%" }}
+              animate={{ width: "0%" }}
+              transition={{ duration: crazy.event.durationMs / 1000, ease: "linear" }}
+            />
+          </motion.div>
+        )}
       </div>
 
       {/* Active recipe bar */}

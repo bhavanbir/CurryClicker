@@ -93,6 +93,30 @@ body {
     box-shadow: 6px 6px 0 0 #191c1e;
   }
 
+  /* Heavy wooden diorama frame for the restaurant scene — visually distinct
+     from the white arcade-box panels and the striped shop drawer */
+  .scene-frame {
+    @apply rounded-xl bg-white;
+    border: 6px solid #523014;
+    box-shadow:
+      inset 0 0 0 4px #a9702f,
+      6px 6px 0 0 #191c1e;
+  }
+
+  /* Shop drawer surface + awning — market-stall stripes so the store reads
+     as its own space, not another game panel */
+  .shop-surface {
+    background-color: #ffdcc3;
+    background-image: repeating-linear-gradient(
+      135deg,
+      rgba(255, 140, 0, 0.08) 0 12px,
+      transparent 12px 24px
+    );
+  }
+  .shop-awning {
+    background: repeating-linear-gradient(90deg, #ff8c00 0 22px, #fffdf8 22px 44px);
+  }
+
   /* Interactive control: lifts on hover, presses down on active */
   .arcade-btn {
     @apply border-4 border-ink rounded-lg transition-all duration-100 font-display font-extrabold;

@@ -22,6 +22,7 @@ export interface CustomerView {
   state: CustomerState;
   reduced: boolean;
   cravingMatched: boolean;
+  expressive: boolean; // ~1 in 10 diners emote above their head
 }
 
 /** Walk tween duration, kept in sync with the director's WALK timer. */
@@ -57,7 +58,7 @@ export function Customer({ c }: { c: CustomerView }) {
   const spriteH = 16 * PIXEL_SCALE * to.scale;
   const delighted = c.cravingMatched && c.state !== "entering";
   const mood = (delighted && MOOD_MATCHED[c.state]) || MOOD[c.state];
-  const pulse = delighted && !c.reduced;
+  const pulse = delighted && !c.reduced && c.expressive;
 
   return (
     <motion.div
@@ -67,15 +68,17 @@ export function Customer({ c }: { c: CustomerView }) {
       transition={{ duration: dur, ease: "linear" }}
       style={{ zIndex: to.z }}
     >
-      {/* mood bubble above the head */}
-      <motion.div
-        className={`absolute left-1/2 flex h-5 w-5 items-center justify-center rounded-full border-2 border-ink ${mood.bg} shadow-arcade-sm`}
-        style={{ bottom: spriteH + 4, x: "-50%" }}
-        animate={pulse ? { scale: [1, 1.25, 1] } : { scale: 1 }}
-        transition={pulse ? { duration: 0.8, repeat: Infinity, ease: "easeInOut" } : { duration: 0 }}
-      >
-        <Icon name={mood.icon} fill size={12} className="text-ink" />
-      </motion.div>
+      {/* mood bubble above the head — only expressive diners emote */}
+      {c.expressive && (
+        <motion.div
+          className={`absolute left-1/2 flex h-5 w-5 items-center justify-center rounded-full border-2 border-ink ${mood.bg} shadow-arcade-sm`}
+          style={{ bottom: spriteH + 4, x: "-50%" }}
+          animate={pulse ? { scale: [1, 1.25, 1] } : { scale: 1 }}
+          transition={pulse ? { duration: 0.8, repeat: Infinity, ease: "easeInOut" } : { duration: 0 }}
+        >
+          <Icon name={mood.icon} fill size={12} className="text-ink" />
+        </motion.div>
+      )}
 
       {/* craving-match sparkles */}
       {pulse &&

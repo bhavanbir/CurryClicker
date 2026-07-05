@@ -1,0 +1,648 @@
+{
+  "pixelScale": 3,
+  "format": "32-bit PNG, transparent, authored at 1x — upscale with image-rendering:pixelated",
+  "ui": {
+    "upgrades": {
+      "src": "ui_upgrades.png",
+      "frameW": 32,
+      "frameH": 32,
+      "columns": 5,
+      "rows": 5,
+      "frames": {
+        "wooden_spoon": {
+          "frame": 0,
+          "col": 0,
+          "row": 0
+        },
+        "steel_ladle": {
+          "frame": 1,
+          "col": 1,
+          "row": 0
+        },
+        "golden_ladle": {
+          "frame": 2,
+          "col": 2,
+          "row": 0
+        },
+        "obsidian_ladle": {
+          "frame": 3,
+          "col": 3,
+          "row": 0
+        },
+        "diamond_ladle": {
+          "frame": 4,
+          "col": 4,
+          "row": 0
+        },
+        "celestial_ladle": {
+          "frame": 5,
+          "col": 0,
+          "row": 1
+        },
+        "chefs_knife": {
+          "frame": 6,
+          "col": 1,
+          "row": 1
+        },
+        "damascus_knife": {
+          "frame": 7,
+          "col": 2,
+          "row": 1
+        },
+        "legendary_cleaver": {
+          "frame": 8,
+          "col": 3,
+          "row": 1
+        },
+        "sous_chef": {
+          "frame": 9,
+          "col": 4,
+          "row": 1
+        },
+        "kitchen_brigade": {
+          "frame": 10,
+          "col": 0,
+          "row": 2
+        },
+        "industrial_pot": {
+          "frame": 11,
+          "col": 1,
+          "row": 2
+        },
+        "curry_conveyor": {
+          "frame": 12,
+          "col": 2,
+          "row": 2
+        },
+        "robot_kitchen": {
+          "frame": 13,
+          "col": 3,
+          "row": 2
+        },
+        "curry_megaworks": {
+          "frame": 14,
+          "col": 4,
+          "row": 2
+        },
+        "delivery_bicycle": {
+          "frame": 15,
+          "col": 0,
+          "row": 3
+        },
+        "delivery_scooter": {
+          "frame": 16,
+          "col": 1,
+          "row": 3
+        },
+        "delivery_van": {
+          "frame": 17,
+          "col": 2,
+          "row": 3
+        },
+        "recipe_slot_4": {
+          "frame": 18,
+          "col": 3,
+          "row": 3
+        },
+        "recipe_slot_5": {
+          "frame": 19,
+          "col": 4,
+          "row": 3
+        },
+        "cozy_extension": {
+          "frame": 20,
+          "col": 0,
+          "row": 4
+        },
+        "extra_seating": {
+          "frame": 21,
+          "col": 1,
+          "row": 4
+        },
+        "dining_hall": {
+          "frame": 22,
+          "col": 2,
+          "row": 4
+        },
+        "grand_floor": {
+          "frame": 23,
+          "col": 3,
+          "row": 4
+        },
+        "curry_emporium": {
+          "frame": 24,
+          "col": 4,
+          "row": 4
+        }
+      }
+    },
+    "ingredients": {
+      "src": "ui_ingredients.png",
+      "frameW": 32,
+      "frameH": 32,
+      "columns": 9,
+      "rows": 5,
+      "frames": {
+        "chili": {
+          "frame": 0,
+          "col": 0,
+          "row": 0
+        },
+        "cumin": {
+          "frame": 1,
+          "col": 1,
+          "row": 0
+        },
+        "turmeric": {
+          "frame": 2,
+          "col": 2,
+          "row": 0
+        },
+        "coriander_seed": {
+          "frame": 3,
+          "col": 3,
+          "row": 0
+        },
+        "cardamom": {
+          "frame": 4,
+          "col": 4,
+          "row": 0
+        },
+        "cloves": {
+          "frame": 5,
+          "col": 5,
+          "row": 0
+        },
+        "cinnamon": {
+          "frame": 6,
+          "col": 6,
+          "row": 0
+        },
+        "nutmeg": {
+          "frame": 7,
+          "col": 7,
+          "row": 0
+        },
+        "star_anise": {
+          "frame": 8,
+          "col": 8,
+          "row": 0
+        },
+        "saffron": {
+          "frame": 9,
+          "col": 0,
+          "row": 1
+        },
+        "garlic": {
+          "frame": 10,
+          "col": 1,
+          "row": 1
+        },
+        "onion": {
+          "frame": 11,
+          "col": 2,
+          "row": 1
+        },
+        "tomato": {
+          "frame": 12,
+          "col": 3,
+          "row": 1
+        },
+        "potato": {
+          "frame": 13,
+          "col": 4,
+          "row": 1
+        },
+        "curry_leaf": {
+          "frame": 14,
+          "col": 5,
+          "row": 1
+        },
+        "pepper": {
+          "frame": 15,
+          "col": 6,
+          "row": 1
+        },
+        "mustard_seed": {
+          "frame": 16,
+          "col": 7,
+          "row": 1
+        },
+        "fenugreek": {
+          "frame": 17,
+          "col": 8,
+          "row": 1
+        },
+        "lemongrass": {
+          "frame": 18,
+          "col": 0,
+          "row": 2
+        },
+        "tamarind": {
+          "frame": 19,
+          "col": 1,
+          "row": 2
+        },
+        "chicken": {
+          "frame": 20,
+          "col": 2,
+          "row": 2
+        },
+        "cashew": {
+          "frame": 21,
+          "col": 3,
+          "row": 2
+        },
+        "ginger": {
+          "frame": 22,
+          "col": 4,
+          "row": 2
+        },
+        "coconut": {
+          "frame": 23,
+          "col": 5,
+          "row": 2
+        },
+        "paprika": {
+          "frame": 24,
+          "col": 6,
+          "row": 2
+        },
+        "garam_masala": {
+          "frame": 25,
+          "col": 7,
+          "row": 2
+        },
+        "yogurt": {
+          "frame": 26,
+          "col": 8,
+          "row": 2
+        },
+        "ghee": {
+          "frame": 27,
+          "col": 0,
+          "row": 3
+        },
+        "salt": {
+          "frame": 28,
+          "col": 1,
+          "row": 3
+        },
+        "mint": {
+          "frame": 29,
+          "col": 2,
+          "row": 3
+        },
+        "shrimp": {
+          "frame": 30,
+          "col": 3,
+          "row": 3
+        },
+        "kokum": {
+          "frame": 31,
+          "col": 4,
+          "row": 3
+        },
+        "malvani_masala": {
+          "frame": 32,
+          "col": 5,
+          "row": 3
+        },
+        "sea_salt": {
+          "frame": 33,
+          "col": 6,
+          "row": 3
+        },
+        "lime_leaf": {
+          "frame": 34,
+          "col": 7,
+          "row": 3
+        },
+        "chaat_masala": {
+          "frame": 35,
+          "col": 8,
+          "row": 3
+        },
+        "green_chutney": {
+          "frame": 36,
+          "col": 0,
+          "row": 4
+        },
+        "pav": {
+          "frame": 37,
+          "col": 1,
+          "row": 4
+        },
+        "jaggery": {
+          "frame": 38,
+          "col": 2,
+          "row": 4
+        },
+        "seekh_kebab": {
+          "frame": 39,
+          "col": 3,
+          "row": 4
+        },
+        "silver_leaf": {
+          "frame": 40,
+          "col": 4,
+          "row": 4
+        },
+        "kewra_water": {
+          "frame": 41,
+          "col": 5,
+          "row": 4
+        },
+        "rose_petals": {
+          "frame": 42,
+          "col": 6,
+          "row": 4
+        },
+        "dried_apricot": {
+          "frame": 43,
+          "col": 7,
+          "row": 4
+        },
+        "white_pepper": {
+          "frame": 44,
+          "col": 8,
+          "row": 4
+        }
+      }
+    },
+    "decorations": {
+      "src": "ui_decorations.png",
+      "frameW": 32,
+      "frameH": 32,
+      "columns": 5,
+      "rows": 4,
+      "frames": {
+        "neko": {
+          "frame": 0,
+          "col": 0,
+          "row": 0
+        },
+        "golden_spatula": {
+          "frame": 1,
+          "col": 1,
+          "row": 0
+        },
+        "spice_rack": {
+          "frame": 2,
+          "col": 2,
+          "row": 0
+        },
+        "arcade": {
+          "frame": 3,
+          "col": 3,
+          "row": 0
+        },
+        "tandoor": {
+          "frame": 4,
+          "col": 4,
+          "row": 0
+        },
+        "shrine": {
+          "frame": 5,
+          "col": 0,
+          "row": 1
+        },
+        "neon_sign": {
+          "frame": 6,
+          "col": 1,
+          "row": 1
+        },
+        "auto_ladle": {
+          "frame": 7,
+          "col": 2,
+          "row": 1
+        },
+        "tulsi": {
+          "frame": 8,
+          "col": 3,
+          "row": 1
+        },
+        "wind_chimes": {
+          "frame": 9,
+          "col": 4,
+          "row": 1
+        },
+        "copper_pots": {
+          "frame": 10,
+          "col": 0,
+          "row": 2
+        },
+        "rangoli": {
+          "frame": 11,
+          "col": 1,
+          "row": 2
+        },
+        "masala_dabba": {
+          "frame": 12,
+          "col": 2,
+          "row": 2
+        },
+        "koi_tank": {
+          "frame": 13,
+          "col": 3,
+          "row": 2
+        },
+        "jukebox": {
+          "frame": 14,
+          "col": 4,
+          "row": 2
+        },
+        "pepper_mill": {
+          "frame": 15,
+          "col": 0,
+          "row": 3
+        },
+        "chandelier": {
+          "frame": 16,
+          "col": 1,
+          "row": 3
+        },
+        "fountain": {
+          "frame": 17,
+          "col": 2,
+          "row": 3
+        },
+        "elephant": {
+          "frame": 18,
+          "col": 3,
+          "row": 3
+        },
+        "herb_garden": {
+          "frame": 19,
+          "col": 4,
+          "row": 3
+        }
+      }
+    },
+    "individual": "sprites/ui/<id>.png (decorations prefixed deco_)"
+  },
+  "scene": {
+    "decorations": {
+      "src": "scene_decorations.png",
+      "frameW": 48,
+      "frameH": 48,
+      "columns": 5,
+      "rows": 4,
+      "frames": {
+        "neko": {
+          "frame": 0,
+          "nativeW": 16,
+          "nativeH": 16,
+          "anchor": "bottom-center"
+        },
+        "golden_spatula": {
+          "frame": 1,
+          "nativeW": 16,
+          "nativeH": 32,
+          "anchor": "bottom-center"
+        },
+        "spice_rack": {
+          "frame": 2,
+          "nativeW": 32,
+          "nativeH": 24,
+          "anchor": "bottom-center"
+        },
+        "arcade": {
+          "frame": 3,
+          "nativeW": 16,
+          "nativeH": 32,
+          "anchor": "bottom-center"
+        },
+        "tandoor": {
+          "frame": 4,
+          "nativeW": 32,
+          "nativeH": 24,
+          "anchor": "bottom-center"
+        },
+        "shrine": {
+          "frame": 5,
+          "nativeW": 32,
+          "nativeH": 24,
+          "anchor": "bottom-center"
+        },
+        "neon_sign": {
+          "frame": 6,
+          "nativeW": 32,
+          "nativeH": 16,
+          "anchor": "bottom-center"
+        },
+        "auto_ladle": {
+          "frame": 7,
+          "nativeW": 32,
+          "nativeH": 24,
+          "anchor": "bottom-center"
+        },
+        "tulsi": {
+          "frame": 8,
+          "nativeW": 16,
+          "nativeH": 16,
+          "anchor": "bottom-center"
+        },
+        "wind_chimes": {
+          "frame": 9,
+          "nativeW": 16,
+          "nativeH": 32,
+          "anchor": "bottom-center"
+        },
+        "copper_pots": {
+          "frame": 10,
+          "nativeW": 32,
+          "nativeH": 16,
+          "anchor": "bottom-center"
+        },
+        "rangoli": {
+          "frame": 11,
+          "nativeW": 32,
+          "nativeH": 24,
+          "anchor": "bottom-center"
+        },
+        "masala_dabba": {
+          "frame": 12,
+          "nativeW": 16,
+          "nativeH": 16,
+          "anchor": "bottom-center"
+        },
+        "koi_tank": {
+          "frame": 13,
+          "nativeW": 32,
+          "nativeH": 24,
+          "anchor": "bottom-center"
+        },
+        "jukebox": {
+          "frame": 14,
+          "nativeW": 16,
+          "nativeH": 32,
+          "anchor": "bottom-center"
+        },
+        "pepper_mill": {
+          "frame": 15,
+          "nativeW": 16,
+          "nativeH": 32,
+          "anchor": "bottom-center"
+        },
+        "chandelier": {
+          "frame": 16,
+          "nativeW": 32,
+          "nativeH": 32,
+          "anchor": "bottom-center"
+        },
+        "fountain": {
+          "frame": 17,
+          "nativeW": 48,
+          "nativeH": 48,
+          "anchor": "bottom-center"
+        },
+        "elephant": {
+          "frame": 18,
+          "nativeW": 32,
+          "nativeH": 48,
+          "anchor": "bottom-center"
+        },
+        "herb_garden": {
+          "frame": 19,
+          "nativeW": 48,
+          "nativeH": 24,
+          "anchor": "bottom-center"
+        }
+      }
+    },
+    "individual": "sprites/scene/<id>.png",
+    "props": {
+      "src": "props.png",
+      "frameW": 16,
+      "frameH": 16,
+      "columns": 4,
+      "rows": 1,
+      "frames": {
+        "table": 0,
+        "plant": 1,
+        "door": 2,
+        "window": 3
+      }
+    },
+    "curry": {
+      "src": "curry.png",
+      "frameW": 16,
+      "frameH": 16,
+      "columns": 2,
+      "rows": 1,
+      "frames": [
+        0,
+        1
+      ]
+    },
+    "customer": {
+      "src": "customer.png",
+      "frameW": 16,
+      "frameH": 16,
+      "columns": 3,
+      "rows": 4,
+      "note": "row=palette variant; col 0=idle, cols 1-2=walk cycle (matches customerAnim)"
+    }
+  }
+}

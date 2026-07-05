@@ -87,12 +87,12 @@ export function ShopDrawer({
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={{ type: "spring", damping: 26, stiffness: 260 }}
-              className="fixed inset-y-0 right-0 z-[47] flex w-full flex-col border-l-4 border-ink bg-cream shadow-[-8px_0_0_0_#191c1e] md:w-[400px]"
+              className="shop-surface fixed inset-y-0 right-0 z-[47] flex w-full flex-col border-l-4 border-ink shadow-[-8px_0_0_0_#191c1e] md:w-[400px]"
             >
-              {/* Header */}
-              <div className="flex items-center gap-2 border-b-4 border-ink bg-cream px-4 py-3">
-                <Icon name="storefront" fill size={26} className="text-primary" />
-                <h2 className="font-display text-2xl font-black uppercase text-ink">
+              {/* Header — solid band + striped awning so the shop reads as a storefront */}
+              <div className="flex items-center gap-2 bg-primary px-4 py-3">
+                <Icon name="storefront" fill size={26} className="text-white" />
+                <h2 className="font-display text-2xl font-black uppercase text-white text-stroke-ink">
                   Store
                 </h2>
                 <div className="ml-auto flex items-center gap-1.5 rounded-lg border-2 border-ink bg-tertiary-fixed px-3 py-1.5 shadow-arcade-sm">
@@ -111,6 +111,9 @@ export function ShopDrawer({
                   <Icon name="close" size={20} />
                 </button>
               </div>
+
+              {/* Awning stripe */}
+              <div className="shop-awning h-3 shrink-0 border-b-4 border-t-2 border-ink" />
 
               {/* Tabs */}
               <div className="flex gap-2 border-b-2 border-ink/10 px-4 py-3">

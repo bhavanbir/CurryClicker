@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { useGameStore } from "../store/useGameStore";
 import { formatScore } from "../lib/format";
@@ -7,13 +8,17 @@ interface Props {
 }
 
 // Big stroked arcade score. Pulses on change by re-mounting via `key`.
+// Tapping the "High" line opens a small popover explaining why the current
+// score and the high score drift apart.
 export function ScoreDisplay({ showHighScore = true }: Props) {
   const currentCurry = useGameStore((s) => s.currentCurry);
+  const weekCurry = useGameStore((s) => s.weekCurry);
   const highScore = useGameStore((s) => s.highScore);
+  const [open, setOpen] = useState(false);
   const text = formatScore(currentCurry);
 
   return (
-    <div className="flex flex-col items-center leading-none">
+    <div className="relative flex flex-col items-center leading-none">
       <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-ink/50">
         Score
       </span>
@@ -27,10 +32,66 @@ export function ScoreDisplay({ showHighScore = true }: Props) {
         {text}
       </motion.span>
       {showHighScore && (
-        <span className="mt-0.5 text-[10px] font-bold uppercase tracking-widest text-ink/55">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          title="What does High mean?"
+          className="mt-0.5 text-[10px] font-bold uppercase tracking-widest text-ink/55 underline decoration-dotted underline-offset-2"
+        >
           High {formatScore(highScore)}
-        </span>
+        </button>
       )}
+
+      {open && (
+        <>
+          {/* click-outside catcher */}
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="arcade-box absolute top-full z-50 mt-2 w-64 -translate-x-1/2 p-3 text-left"
+            style={{ left: "50%" }}
+          >
+            <ScoreRow label="Score" value={formatScore(currentCurry)}>
+              Spendable curry — drops when you buy upgrades or decor.
+            </ScoreRow>
+            <ScoreRow label="This week" value={formatScore(weekCurry)}>
+              Everything earned this week; spending never lowers it.
+            </ScoreRow>
+            <ScoreRow label="High score" value={formatScore(highScore)}>
+              Your best single week's total, ever.
+            </ScoreRow>
+            <p className="mt-2 border-t-2 border-ink/10 pt-2 text-[11px] font-semibold leading-snug text-ink/60">
+              Score drops when you spend — High Score tracks your best week's
+              earnings, so they drift apart.
+            </p>
+          </motion.div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function ScoreRow({
+  label,
+  value,
+  children,
+}: {
+  label: string;
+  value: string;
+  children: string;
+}) {
+  return (
+    <div className="mb-1.5">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-[10px] font-black uppercase tracking-wide text-ink/60">
+          {label}
+        </span>
+        <span className="font-display text-sm font-black tabular-nums text-ink">
+          {value}
+        </span>
+      </div>
+      <p className="text-[11px] font-semibold leading-snug text-ink/60">{children}</p>
     </div>
   );
 }

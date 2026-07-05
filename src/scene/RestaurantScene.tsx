@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
 import { Sprite } from "./Sprite";
 import { SceneBackdrop } from "./SceneBackdrop";
 import { Counter, COUNTER_CAPACITY } from "./Counter";
@@ -60,7 +59,6 @@ export function RestaurantScene({
   const removePlacement = useGameStore((s) => s.removePlacement);
   const { expansionLevel } = useEffects();
   const tables = tablesForLevel(expansionLevel);
-  const reducedMotion = useReducedMotion();
 
   const [editing, setEditing] = useState(false);
 
@@ -91,7 +89,7 @@ export function RestaurantScene({
       /* `isolate` confines the scene's large internal z-indexes (counter/sign/
          editor use 2000–4000) to their own stacking context, so they never
          paint over page-level modals like the onboarding/week-summary overlays. */
-      className="arcade-box relative isolate h-[240px] w-full cursor-pointer select-none overflow-hidden sm:h-[300px] md:h-[340px] lg:h-[380px] xl:h-[420px]"
+      className="scene-frame relative isolate h-[240px] w-full cursor-pointer select-none overflow-hidden sm:h-[300px] md:h-[340px] lg:h-[380px] xl:h-[420px]"
     >
       <SceneBackdrop skin={activeSkin} />
 
@@ -138,32 +136,6 @@ export function RestaurantScene({
 
       {/* Foreground counter, piling up with cooked curry */}
       <Counter count={filled} skin={activeSkin} />
-
-      {/* Cook impact — one-shot pulse + steam puffs at the counter. Keyed on
-          cookSignal so each cook remounts a fresh animation; no loops. */}
-      {cookSignal > 0 && !reducedMotion && (
-        <div
-          key={cookSignal}
-          className="pointer-events-none absolute left-1/2 top-[70%] z-[2300] -translate-x-1/2"
-        >
-          <motion.div
-            className="absolute -left-8 -top-8 h-16 w-16 rounded-full border-4 border-white/70"
-            initial={{ opacity: 0.6, scale: 0.3 }}
-            animate={{ opacity: 0, scale: 1.4 }}
-            transition={{ duration: 0.45, ease: "easeOut" }}
-          />
-          {[-12, 0, 12].map((dx, i) => (
-            <motion.div
-              key={i}
-              className="absolute h-2.5 w-2.5 rounded-full bg-white/80"
-              style={{ left: dx - 5, top: -8 }}
-              initial={{ opacity: 0.8, y: 0, scale: 0.6 }}
-              animate={{ opacity: 0, y: -26, scale: 1.3 }}
-              transition={{ duration: 0.6, delay: i * 0.07, ease: "easeOut" }}
-            />
-          ))}
-        </div>
-      )}
 
       {/* Decorate-mode overlay (tray, grid targets, skin picker) */}
       {editing && <SceneEditor onClose={() => setEditing(false)} />}

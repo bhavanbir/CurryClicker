@@ -75,9 +75,11 @@ export function useCustomerDirector({
       // Snapshot at spawn: this diner reacts to the dish as served, even if the
       // player re-slots the recipe mid-visit.
       const cravingMatched = matchedRef.current;
+      // Cosmetic roll: ~1 in 10 diners are expressive and emote above their head.
+      const expressive = Math.random() < 0.1;
       setCustomers((list) => [
         ...list,
-        { id, seat, state: "entering", reduced, cravingMatched },
+        { id, seat, state: "entering", reduced, cravingMatched, expressive },
       ]);
 
       const setState = (state: CustomerView["state"]) =>

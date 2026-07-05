@@ -1,4 +1,6 @@
 import { INGREDIENTS } from "../engine/ingredients";
+import type { AffinityMatrix } from "../types";
+import { affinityRing } from "../lib/affinityUi";
 import { Icon } from "./arcade/Icon";
 import { PixelIcon } from "./PixelIcon";
 
@@ -6,12 +8,25 @@ interface Props {
   index: number; // 0-based slot index (shown as 1-based)
   ingredientId: string | null;
   locked?: boolean;
+  hoveredId?: string | null; // pantry card under the cursor → hot/cold aura
+  matrix?: AffinityMatrix;
   onClick?: () => void;
 }
 
 // One numbered slot in the crafting station. Tap a filled slot to remove it.
-export function RecipeSlot({ index, ingredientId, locked, onClick }: Props) {
+export function RecipeSlot({
+  index,
+  ingredientId,
+  locked,
+  hoveredId,
+  matrix,
+  onClick,
+}: Props) {
   const ingredient = ingredientId ? INGREDIENTS[ingredientId] : null;
+  const aura =
+    ingredientId && matrix && hoveredId && hoveredId !== ingredientId
+      ? affinityRing(matrix[ingredientId]?.[hoveredId] ?? 0)
+      : "";
 
   if (locked) {
     return (
@@ -27,7 +42,7 @@ export function RecipeSlot({ index, ingredientId, locked, onClick }: Props) {
       onClick={onClick}
       className={`group relative flex h-[72px] w-[72px] flex-col items-center justify-center rounded-md border-4 border-ink shadow-arcade-sm transition-all md:h-[88px] md:w-[88px] ${
         ingredient ? "bg-white" : "border-dashed bg-cream-100"
-      }`}
+      } ${aura}`}
       title={ingredient ? `Remove ${ingredient.name}` : "Empty slot"}
     >
       <span className="absolute left-1 top-1 text-[10px] font-bold text-ink/55">

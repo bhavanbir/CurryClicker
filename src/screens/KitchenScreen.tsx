@@ -94,6 +94,8 @@ export function KitchenScreen({ onNavigate }: Props) {
                 index={i}
                 ingredientId={id}
                 locked={i >= unlockedSlots}
+                hoveredId={hoveredId}
+                matrix={matrix}
                 onClick={() => id && setIngredient(i, null)}
               />
             ))}

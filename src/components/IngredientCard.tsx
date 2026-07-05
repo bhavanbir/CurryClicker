@@ -1,7 +1,9 @@
 import type { AffinityMatrix, Ingredient, IngredientSet } from "../types";
 import { FRANCHISE_UPGRADES } from "../engine/franchiseData";
+import { affinityRing } from "../lib/affinityUi";
 import { Icon } from "./arcade/Icon";
 import { PixelIcon } from "./PixelIcon";
+import { FLAVOR_META } from "./FlavorTag";
 
 interface Props {
   ingredient: Ingredient;
@@ -29,8 +31,7 @@ const RARITY_DOT: Record<Ingredient["rarity"], string> = {
 };
 
 // Hot/Cold aura: when a pantry card is hovered, cards already IN the recipe glow
-// green (positive affinity) or red (negative). Direction only — exact values are
-// a Phase-2 "Affinity Lens" upgrade.
+// green (positive affinity) or red (negative).
 function auraRing(
   ingredientId: string,
   hoveredId: string | null,
@@ -39,11 +40,7 @@ function auraRing(
 ): string {
   if (!hoveredId || hoveredId === ingredientId) return "";
   if (!slots.includes(ingredientId)) return "";
-  const affinity = matrix[ingredientId]?.[hoveredId] ?? 0;
-  if (affinity > 0.5) return "ring-4 ring-tier-good";
-  if (affinity > 0) return "ring-2 ring-tier-good/60";
-  if (affinity < -0.3) return "ring-4 ring-tier-terrible";
-  return "ring-2 ring-ink/15";
+  return affinityRing(matrix[ingredientId]?.[hoveredId] ?? 0);
 }
 
 export function IngredientCard({
@@ -60,6 +57,12 @@ export function IngredientCard({
 }: Props) {
   const aura = locked ? "" : auraRing(ingredient.id, hoveredId, slots, matrix);
   const setName = ingredient.set ? SET_NAME[ingredient.set] : undefined;
+  const flavor = FLAVOR_META[ingredient.flavor];
+  const flavorPip = (
+    <span title={`${flavor.label} flavor`} className="absolute left-1.5 top-1.5">
+      <Icon name={flavor.icon} fill size={14} className={flavor.text} />
+    </span>
+  );
 
   if (locked) {
     return (
@@ -73,6 +76,7 @@ export function IngredientCard({
         }
         className="relative flex aspect-square cursor-not-allowed flex-col items-center justify-center gap-1 rounded-xl border-4 border-dashed border-ink/40 bg-cream-50 p-1.5 opacity-70"
       >
+        {flavorPip}
         <Icon
           name={ingredient.icon}
           className={`${ingredient.color} opacity-50 grayscale`}
@@ -111,6 +115,7 @@ export function IngredientCard({
       <span
         className={`absolute right-1.5 top-1.5 h-2 w-2 rounded-full border border-ink ${RARITY_DOT[ingredient.rarity]}`}
       />
+      {flavorPip}
       <PixelIcon id={ingredient.id} icon={ingredient.icon} size={32} iconClassName={ingredient.color} />
       <span className="w-full truncate px-0.5 text-center text-[11px] font-bold leading-tight text-ink">
         {ingredient.name}
