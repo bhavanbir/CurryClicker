@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { playStarAward } from "../lib/sfx";
+import { useGameStore } from "../store/useGameStore";
+import { DAY_DURATION_SECONDS } from "../config";
 
 // Crazy Curry — random click-rush events. While one is live, every cook made
 // above the clicks-per-second floor pays `mult`×; higher floors pay bigger.
@@ -37,10 +39,21 @@ export function useCrazyCurry(active: boolean) {
       return;
     }
     let timer: number;
+    let fired = false; // has an event started since this activation (day)?
     const schedule = () => {
-      const gap = MIN_GAP_MS + Math.random() * (MAX_GAP_MS - MIN_GAP_MS);
+      let gap = MIN_GAP_MS + Math.random() * (MAX_GAP_MS - MIN_GAP_MS);
+      if (!fired) {
+        // Guarantee ≥1 event per day: the first gap must fit inside what's
+        // left of the day (the default 45–90s gap outlives a 60s day).
+        // ponytail: soft guarantee — a recipe built in the day's last ~7s
+        // can still miss it; force-fire at day end if players notice.
+        const remaining =
+          (1 - useGameStore.getState().dayProgress) * DAY_DURATION_SECONDS * 1000;
+        gap = Math.max(5_000, Math.min(gap, remaining - EVENT_MS - 2_000));
+      }
       setNextEventAt(Date.now() + gap);
       timer = window.setTimeout(() => {
+        fired = true;
         const tier = TIERS[Math.floor(Math.random() * TIERS.length)];
         setOnPace(false);
         setNextEventAt(null);

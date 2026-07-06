@@ -76,6 +76,7 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
   const dayPaused = useGameStore((s) => s.dayPaused);
   const startDay = useGameStore((s) => s.startDay);
   const togglePause = useGameStore((s) => s.togglePause);
+  const setPaused = useGameStore((s) => s.setPaused);
   const weeksCompleted = useGameStore((s) => s.weeksCompleted);
   const totalCurryAllTime = useGameStore((s) => s.totalCurryAllTime);
   const highestTierSeen = useGameStore((s) => s.highestTierSeen);
@@ -220,6 +221,27 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
     if (crazy.event) shakeScene("sm");
   }, [crazy.event?.startedAt]);
 
+  // Naming a recipe freezes the day clock. Track whether *we* paused so
+  // closing the modal never unpauses a manually paused day.
+  const autoPausedRef = useRef(false);
+  useEffect(() => {
+    if (namingFp) {
+      if (!useGameStore.getState().dayPaused) {
+        setPaused(true);
+        autoPausedRef.current = true;
+      }
+    } else if (autoPausedRef.current) {
+      autoPausedRef.current = false;
+      setPaused(false);
+    }
+  }, [namingFp, setPaused]);
+
+  // Day end sweeps any live crit circle off the screen; the pending expiry
+  // timeouts are id-guarded so they no-op against the cleared state.
+  useEffect(() => {
+    if (!dayStarted) setCrit(null);
+  }, [dayStarted]);
+
   function spawnCrit(tier: CritTier, chain: number) {
     const rect = sceneWrapRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -249,6 +271,9 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
 
   function clickCrit(c: NonNullable<typeof crit>) {
     if (c.phase !== "live") return;
+    // cook() below is day-guarded, but the chained spawnCrit is not — block
+    // the whole thing once the day is over or paused.
+    if (!dayStarted || dayPaused) return;
     setCrit(null);
     critHoverRef.current = false;
     cook(c.x, c.y, c.tier.mult);
@@ -336,6 +361,26 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
           onCook={cook}
           busy={hasRecipe && dayStarted && !dayPaused}
           cravingMatched={score.cravingMatched ?? false}
+          onDinerFed={() => {
+            // Diners tip base click value (no crit/crazy/fire mults), scaled
+            // by expansion tier — bigger rooms are a real income line.
+            const tip = Math.max(
+              1,
+              Math.floor(perCook * 0.2 * (1 + effects.expansionLevel)),
+            );
+            addCurry(tip);
+            const rect = sceneWrapRef.current?.getBoundingClientRect();
+            if (!rect) return;
+            const id = floatId++;
+            const x = rect.width / 2 + (Math.random() * 120 - 60);
+            setFloats((f) =>
+              [...f, { id, x, y: rect.height * 0.35, label: `Tip! +${formatCurry(tip)}` }].slice(-12),
+            );
+            window.setTimeout(
+              () => setFloats((f) => f.filter((fl) => fl.id !== id)),
+              800,
+            );
+          }}
         />
         <AnimatePresence>
           {floats.map((f) => (

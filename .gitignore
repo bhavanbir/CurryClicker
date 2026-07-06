@@ -13,3 +13,5 @@ vite.out
 *.log
 .vscode/*
 !.vscode/extensions.json
+release
+.claude

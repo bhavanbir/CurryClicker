@@ -134,6 +134,7 @@ export interface GameState {
   advanceDayProgress: (frac: number) => void;
   startDay: () => void;
   togglePause: () => void;
+  setPaused: (paused: boolean) => void;
   ensureCurrentWeek: () => void;
   startNewWeek: () => void;
   hardReset: () => void;
@@ -441,6 +442,9 @@ export const useGameStore = create<GameState>()(
 
       togglePause: () =>
         set((s) => (s.dayStarted ? { dayPaused: !s.dayPaused } : {})),
+
+      setPaused: (paused) =>
+        set((s) => (s.dayStarted ? { dayPaused: paused } : {})),
 
       ensureCurrentWeek: () => {
         const id = getCurrentWeekId();

@@ -524,8 +524,8 @@ export const DECORATION_MAP: Record<string, Decoration> = Object.fromEntries(
 // Each completed week ("prestige") upgrades are wiped and re-bought at higher
 // prices, but every ladle — including your bare hands — cooks harder.
 // ponytail: three tuning knobs, no config system
-export const PRESTIGE_LADLE_GROWTH = 0.1; // +10% ladle power per completed week
-export const LADLE_CAP_RATIO = 2; // capped ladles top out at 2× printed value (hit at prestige 10)
+export const PRESTIGE_LADLE_GROWTH = 0.25; // +25%/wk — must visibly keep pace with the ×1.5^wk cost curve
+export const LADLE_CAP_RATIO = 4; // capped ladles top out at 4× printed value (hit at prestige 12)
 export const UPGRADE_COST_GROWTH = 1.5; // all upgrade costs ×1.5^prestige
 
 const LADLE_IDS = new Set([

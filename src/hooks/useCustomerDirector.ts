@@ -18,6 +18,8 @@ interface Opts {
   open: boolean;
   dishesAvailable: number;
   consumeDish: () => void;
+  /** Fired when a diner finishes eating (not when kicked out at close). */
+  onFed?: () => void;
   expansionLevel: number;
   cravingMatched: boolean;
 }
@@ -26,6 +28,7 @@ export function useCustomerDirector({
   open,
   dishesAvailable,
   consumeDish,
+  onFed,
   expansionLevel,
   cravingMatched,
 }: Opts): CustomerView[] {
@@ -42,6 +45,8 @@ export function useCustomerDirector({
   openRef.current = open;
   const consumeRef = useRef(consumeDish);
   consumeRef.current = consumeDish;
+  const onFedRef = useRef(onFed);
+  onFedRef.current = onFed;
   const matchedRef = useRef(cravingMatched);
   matchedRef.current = cravingMatched;
 
@@ -89,7 +94,10 @@ export function useCustomerDirector({
 
       timers.current.push(
         window.setTimeout(() => setState("eating"), WALK),
-        window.setTimeout(() => setState("leaving"), WALK + EAT),
+        window.setTimeout(() => {
+          setState("leaving");
+          onFedRef.current?.(); // finished eating — pay up
+        }, WALK + EAT),
         window.setTimeout(
           () => setCustomers((list) => list.filter((c) => c.id !== id)),
           WALK + EAT + WALK,
@@ -104,6 +112,21 @@ export function useCustomerDirector({
       timers.current = [];
     };
   }, [reduced, expansionLevel]);
+
+  // Closing time: the moment the shop closes (day end, pause, recipe cleared),
+  // everyone still inside walks out — cancel their eat/leave chains and reuse
+  // the existing "leaving" tween, then despawn once they reach the door.
+  useEffect(() => {
+    if (open) return;
+    const WALK = reduced ? 60 : 1500; // keep in sync with Customer WALK_SEC
+    timers.current.forEach((t) => window.clearTimeout(t));
+    timers.current = [];
+    setCustomers((list) =>
+      list.length === 0 ? list : list.map((c) => ({ ...c, state: "leaving" })),
+    );
+    const t = window.setTimeout(() => setCustomers([]), WALK);
+    return () => window.clearTimeout(t);
+  }, [open, reduced]);
 
   return customers;
 }

@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useGameStore } from "../store/useGameStore";
 import { formatCurry } from "../lib/format";
-import { UPGRADES, DECORATIONS, UPGRADE_MAP, upgradeCost } from "../engine/shopData";
+import { UPGRADES, DECORATIONS, UPGRADE_MAP, upgradeCost, ladleValue } from "../engine/shopData";
 import { COSMETICS } from "../data/sampleData";
 import type { Upgrade, Decoration } from "../types";
+import type { Screen } from "../navigation";
 import { Icon } from "./arcade/Icon";
 import { PixelIcon } from "./PixelIcon";
 import { ArcadeButton } from "./arcade/ArcadeButton";
@@ -63,10 +64,12 @@ export function ShopDrawer({
   open,
   onOpen,
   onClose,
+  onNavigate,
 }: {
   open: boolean;
   onOpen: () => void;
   onClose: () => void;
+  onNavigate: (s: Screen) => void;
 }) {
   const currentCurry = useGameStore((s) => s.currentCurry);
   const purchasedUpgrades = useGameStore((s) => s.purchasedUpgrades);
@@ -177,6 +180,15 @@ export function ShopDrawer({
                     label="Skins"
                   />
                 )}
+                {/* Nav shortcut, not a content tab — Franchise HQ is its own screen */}
+                <TabButton
+                  active={false}
+                  onClick={() => {
+                    onClose();
+                    onNavigate("franchise");
+                  }}
+                  label="Franchise"
+                />
               </div>
 
               {/* Items */}
@@ -208,10 +220,25 @@ export function ShopDrawer({
                             const prereqMet =
                               !u.prerequisiteUpgradeId ||
                               purchasedUpgrades.includes(u.prerequisiteUpgradeId);
+                            // Ladles grow with prestige — show the real
+                            // multiplier, not the printed week-0 value.
+                            const boosted =
+                              u.effect.type === "click_multiplier"
+                                ? ladleValue(u, weeksCompleted)
+                                : null;
+                            const item =
+                              u.effect.type === "click_multiplier" &&
+                              boosted !== null &&
+                              boosted !== u.effect.value
+                                ? {
+                                    ...u,
+                                    description: `×${boosted.toFixed(2)} cook value (prestige boost)`,
+                                  }
+                                : u;
                             return (
                               <ShopCard
                                 key={u.id}
-                                item={u}
+                                item={item}
                                 cost={upgradeCost(u, weeksCompleted)}
                                 statusLabel={owned ? "Owned" : undefined}
                                 owned={owned}

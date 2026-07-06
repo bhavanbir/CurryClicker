@@ -103,11 +103,12 @@ export default function App() {
 
       {phase === "week_summary" && <WeekSummaryModal onNavigate={setScreen} />}
       <RewardsLayer />
-      <ChefSpecialPanel onMixIn={() => setScreen("kitchen")} />
+      <ChefSpecialPanel />
       <ShopDrawer
         open={shopOpen}
         onOpen={() => setShopOpen(true)}
         onClose={() => setShopOpen(false)}
+        onNavigate={setScreen}
       />
       {!shopOpen && <ShopNotifier onOpenShop={() => setShopOpen(true)} />}
       <BadgeNotifier onOpenProfile={() => setScreen("profile")} />

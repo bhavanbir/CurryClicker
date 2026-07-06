@@ -27,6 +27,7 @@ interface Props {
   onCook: (x: number, y: number) => void;
   busy?: boolean; // recipe ready -> scene is "open"
   cravingMatched?: boolean; // active recipe matches today's craving
+  onDinerFed?: () => void; // a diner finished eating (tip hook)
 }
 
 /** A sprite ground-anchored at a projected floor/wall point. */
@@ -53,6 +54,7 @@ export function RestaurantScene({
   onCook,
   busy = true,
   cravingMatched = false,
+  onDinerFed,
 }: Props) {
   const activeSkin = useGameStore((s) => s.activeSkin);
   const placements = useGameStore((s) => s.decorationPlacements);
@@ -73,6 +75,7 @@ export function RestaurantScene({
     open: busy && !editing,
     dishesAvailable: filled,
     consumeDish: () => setFilled((f) => Math.max(0, f - 1)),
+    onFed: onDinerFed,
     expansionLevel,
     cravingMatched,
   });
