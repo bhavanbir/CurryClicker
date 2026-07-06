@@ -46,7 +46,6 @@ ipcMain.handle("save:write", (_e, data) => {
 
 ipcMain.handle("steam:achievement", (_e, id) => steam.unlockAchievement(id));
 ipcMain.handle("steam:score", (_e, value) => steam.submitWeekScore(value));
-ipcMain.handle("steam:available", () => steam.isAvailable());
 
 function createWindow() {
   const win = new BrowserWindow({

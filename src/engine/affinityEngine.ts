@@ -6,7 +6,7 @@ import { GUARANTEED_RECIPE_COUNT } from "../config";
 // Deterministically builds the full weekly affinity matrix plus a set of
 // guaranteed all-positive recipes from a single integer seed. Same seed ->
 // same data for every player that week.
-export function buildAffinityData(seed: number): AffinityData {
+function buildAffinityData(seed: number): AffinityData {
   const rng = makeRng(seed);
 
   // Step 1: raw symmetric pairwise affinity matrix.

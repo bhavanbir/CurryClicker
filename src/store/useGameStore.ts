@@ -2,7 +2,6 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { saveStorage } from "../lib/saveStorage";
 import { unlockAchievement, submitWeekScore } from "../lib/desktop";
-import { Decimal } from "../lib/decimal";
 import type {
   DailySnapshot,
   DiscoveredRecipe,
@@ -27,7 +26,7 @@ import { computeEffects } from "../engine/effects";
 import { computeAutoProduction } from "../engine/autoEngine";
 import { recipeFingerprint } from "../engine/cookbook";
 import { evaluateBadges } from "../engine/badges";
-import { UPGRADE_MAP, DECORATION_MAP } from "../engine/shopData";
+import { UPGRADE_MAP, DECORATION_MAP, upgradeCost } from "../engine/shopData";
 import {
   FRANCHISE_UPGRADE_MAP,
   headStartCurry,
@@ -57,10 +56,10 @@ const EMPTY_SLOTS: (string | null)[] = [null, null, null, null, null];
 
 export interface GameState {
   // --- player ---
-  currentCurry: Decimal;
-  totalCurryAllTime: Decimal;
-  weekCurry: Decimal; // this week's leaderboard score
-  highScore: Decimal; // best weekCurry ever reached
+  currentCurry: number;
+  totalCurryAllTime: number;
+  weekCurry: number; // this week's leaderboard score
+  highScore: number; // best weekCurry ever reached
   clicksThisWeek: number;
 
   // --- settings ---
@@ -109,13 +108,14 @@ export interface GameState {
   currentDay: number; // 1–7
   dayProgress: number; // 0.0–1.0 within the current day
   dayStarted: boolean; // false until the player presses Start Day — clock paused
-  autoProduction: Decimal; // derived: decoration + auto-clicker CPS × recipe mult
-  todayCurry: Decimal;
+  dayPaused: boolean; // mid-day pause; not persisted (a reload lands pre-day anyway)
+  autoProduction: number; // derived: decoration + auto-clicker CPS × recipe mult
+  todayCurry: number;
   todayClicks: number;
   dailySnapshots: DailySnapshot[];
 
   // --- actions ---
-  addCurry: (amount: Decimal) => void;
+  addCurry: (amount: number) => void;
   registerClick: () => void;
   setAudio: (
     patch: Partial<Pick<GameState, "sfxOn" | "musicOn" | "sfxVolume" | "musicVolume">>,
@@ -127,12 +127,13 @@ export interface GameState {
   clearRecipe: () => void;
   advanceDayProgress: (frac: number) => void;
   startDay: () => void;
+  togglePause: () => void;
   ensureCurrentWeek: () => void;
   startNewWeek: () => void;
   hardReset: () => void;
 
   // economy
-  spendCurry: (amount: Decimal) => void;
+  spendCurry: (amount: number) => void;
   purchaseUpgrade: (id: string) => boolean;
   purchaseDecoration: (id: string) => boolean;
   buyFranchiseUpgrade: (id: string) => boolean;
@@ -155,7 +156,12 @@ const initialWeekId = getCurrentWeekId();
 
 // Active recipe tier for the current slots, including decoration spice bonus.
 function currentTier(s: GameState): RecipeTier {
-  const eff = computeEffects(s.purchasedUpgrades, s.ownedDecorations, s.franchiseUpgrades);
+  const eff = computeEffects(
+    s.purchasedUpgrades,
+    s.ownedDecorations,
+    s.franchiseUpgrades,
+    s.weeksCompleted,
+  );
   const { matrix } = getAffinityData(s.seed);
   return computeRecipeScore(s.slots, matrix, {
     spicePairBonus: eff.spicePairAffinityBonus,
@@ -174,10 +180,10 @@ function nextFreeCell(placements: Placement[]): { col: number; row: number } | n
 export const useGameStore = create<GameState>()(
   persist(
     (set, get) => ({
-      currentCurry: new Decimal(0),
-      totalCurryAllTime: new Decimal(0),
-      weekCurry: new Decimal(0),
-      highScore: new Decimal(0),
+      currentCurry: 0,
+      totalCurryAllTime: 0,
+      weekCurry: 0,
+      highScore: 0,
       clicksThisWeek: 0,
 
       sfxOn: true,
@@ -217,20 +223,21 @@ export const useGameStore = create<GameState>()(
       currentDay: 1,
       dayProgress: 0,
       dayStarted: false,
-      autoProduction: new Decimal(0),
-      todayCurry: new Decimal(0),
+      dayPaused: false,
+      autoProduction: 0,
+      todayCurry: 0,
       todayClicks: 0,
       dailySnapshots: [],
 
       addCurry: (amount) =>
         set((s) => {
-          const weekCurry = s.weekCurry.add(amount);
+          const weekCurry = s.weekCurry + amount;
           return {
-            currentCurry: s.currentCurry.add(amount),
-            totalCurryAllTime: s.totalCurryAllTime.add(amount),
+            currentCurry: s.currentCurry + amount,
+            totalCurryAllTime: s.totalCurryAllTime + amount,
             weekCurry,
-            highScore: weekCurry.gt(s.highScore) ? weekCurry : s.highScore,
-            todayCurry: s.todayCurry.add(amount),
+            highScore: Math.max(weekCurry, s.highScore),
+            todayCurry: s.todayCurry + amount,
           };
         }),
 
@@ -282,8 +289,9 @@ export const useGameStore = create<GameState>()(
       advanceDayProgress: (frac) => {
         const weeksBefore = get().weeksCompleted;
         set((s) => {
-          // Clock only runs while the day is open (player pressed Start Day).
-          if (s.phase !== "cooking" || !s.dayStarted) return {};
+          // Clock only runs while the day is open (player pressed Start Day)
+          // and not paused.
+          if (s.phase !== "cooking" || !s.dayStarted || s.dayPaused) return {};
 
           let dayProgress = s.dayProgress + frac;
           let currentDay = s.currentDay;
@@ -310,7 +318,7 @@ export const useGameStore = create<GameState>()(
               ...snapshots,
               {
                 day: currentDay,
-                curry: todayCurry.toString(),
+                curry: todayCurry,
                 clicks: todayClicks,
                 tierAtDayEnd,
               },
@@ -345,10 +353,10 @@ export const useGameStore = create<GameState>()(
               cravingMatchDays += 1;
             }
 
-            todayCurry = new Decimal(0);
+            todayCurry = 0;
             todayClicks = 0;
             currentDay += 1;
-            dayStarted = false; // the next day waits for Start Day
+            dayStarted = false; // the next day waits for Start Day (clears any pause below)
 
             if (currentDay > 7) {
               phase = "week_summary";
@@ -390,6 +398,7 @@ export const useGameStore = create<GameState>()(
             currentDay,
             phase,
             dayStarted,
+            dayPaused: dayStarted ? s.dayPaused : false,
             dailySnapshots: snapshots,
             todayCurry,
             todayClicks,
@@ -408,7 +417,7 @@ export const useGameStore = create<GameState>()(
           // Submit the just-completed week's curry total to the Steam
           // leaderboard (no-op off-desktop). weekCurry isn't reset until
           // startNewWeek, so it still holds the final total here.
-          submitWeekScore(s2.weekCurry.toNumber());
+          submitWeekScore(s2.weekCurry);
         }
       },
 
@@ -417,9 +426,12 @@ export const useGameStore = create<GameState>()(
           s.phase === "cooking" &&
           !s.dayStarted &&
           !(IS_DEMO && s.weeksCompleted >= 1)
-            ? { dayStarted: true }
+            ? { dayStarted: true, dayPaused: false }
             : {},
         ),
+
+      togglePause: () =>
+        set((s) => (s.dayStarted ? { dayPaused: !s.dayPaused } : {})),
 
       ensureCurrentWeek: () => {
         const id = getCurrentWeekId();
@@ -464,10 +476,13 @@ export const useGameStore = create<GameState>()(
           currentDay: 1,
           dayProgress: 0,
           dayStarted: false,
-          currentCurry:
-            headStart > 0 ? s.currentCurry.add(new Decimal(headStart)) : s.currentCurry,
-          weekCurry: new Decimal(0),
-          todayCurry: new Decimal(0),
+          dayPaused: false,
+          // Prestige: upgrades reset each week (re-buy at scaled prices with
+          // stronger ladles); decorations persist.
+          purchasedUpgrades: [],
+          currentCurry: s.currentCurry + headStart,
+          weekCurry: 0,
+          todayCurry: 0,
           todayClicks: 0,
           clicksThisWeek: 0,
           dailySnapshots: [],
@@ -488,10 +503,10 @@ export const useGameStore = create<GameState>()(
       hardReset: () => {
         const id = getCurrentWeekId();
         set({
-          currentCurry: new Decimal(0),
-          totalCurryAllTime: new Decimal(0),
-          weekCurry: new Decimal(0),
-          highScore: new Decimal(0),
+          currentCurry: 0,
+          totalCurryAllTime: 0,
+          weekCurry: 0,
+          highScore: 0,
           clicksThisWeek: 0,
           hasOnboarded: true, // already a returning player; don't replay tutorial
           slots: [...EMPTY_SLOTS],
@@ -520,8 +535,9 @@ export const useGameStore = create<GameState>()(
           currentDay: 1,
           dayProgress: 0,
           dayStarted: false,
-          autoProduction: new Decimal(0),
-          todayCurry: new Decimal(0),
+          dayPaused: false,
+          autoProduction: 0,
+          todayCurry: 0,
           todayClicks: 0,
           dailySnapshots: [],
         });
@@ -530,7 +546,7 @@ export const useGameStore = create<GameState>()(
       // --- economy ---
 
       spendCurry: (amount) =>
-        set((s) => ({ currentCurry: s.currentCurry.sub(amount) })),
+        set((s) => ({ currentCurry: s.currentCurry - amount })),
 
       purchaseUpgrade: (id) => {
         const s = get();
@@ -541,11 +557,11 @@ export const useGameStore = create<GameState>()(
         if (up.prerequisiteUpgradeId && !s.purchasedUpgrades.includes(up.prerequisiteUpgradeId)) {
           return false;
         }
-        const cost = new Decimal(up.cost);
-        if (s.currentCurry.lt(cost)) return false;
+        const cost = upgradeCost(up, s.weeksCompleted);
+        if (s.currentCurry < cost) return false;
 
         set((st) => ({
-          currentCurry: st.currentCurry.sub(cost),
+          currentCurry: st.currentCurry - cost,
           purchasedUpgrades: [...st.purchasedUpgrades, id],
         }));
         get().recomputeDerived();
@@ -560,11 +576,11 @@ export const useGameStore = create<GameState>()(
         if (IS_DEMO && !DEMO_DECORATIONS.includes(id)) return false;
         const owned = s.ownedDecorations[id] ?? 0;
         if (owned >= deco.maxQuantity) return false;
-        const cost = new Decimal(deco.cost);
-        if (s.currentCurry.lt(cost)) return false;
+        const cost = deco.cost;
+        if (s.currentCurry < cost) return false;
 
         set((st) => ({
-          currentCurry: st.currentCurry.sub(cost),
+          currentCurry: st.currentCurry - cost,
           ownedDecorations: { ...st.ownedDecorations, [id]: owned + 1 },
         }));
         // Auto-place it so the purchase immediately shows up in the shop. The
@@ -638,7 +654,12 @@ export const useGameStore = create<GameState>()(
 
       recomputeDerived: () =>
         set((s) => {
-          const eff = computeEffects(s.purchasedUpgrades, s.ownedDecorations, s.franchiseUpgrades);
+          const eff = computeEffects(
+            s.purchasedUpgrades,
+            s.ownedDecorations,
+            s.franchiseUpgrades,
+            s.weeksCompleted,
+          );
           const { matrix } = getAffinityData(s.seed);
           return {
             unlockedSlots: eff.unlockedSlots,
@@ -667,7 +688,12 @@ export const useGameStore = create<GameState>()(
         const s = get();
         const ids = slots.filter((x): x is string => x !== null);
         const fingerprint = recipeFingerprint(slots);
-        const eff = computeEffects(s.purchasedUpgrades, s.ownedDecorations, s.franchiseUpgrades);
+        const eff = computeEffects(
+          s.purchasedUpgrades,
+          s.ownedDecorations,
+          s.franchiseUpgrades,
+          s.weeksCompleted,
+        );
         const { matrix } = getAffinityData(s.seed);
         const score = computeRecipeScore(slots, matrix, {
           spicePairBonus: eff.spicePairAffinityBonus,
@@ -814,14 +840,13 @@ export const useGameStore = create<GameState>()(
         }
         return p as unknown as GameState;
       },
-      // Decimals are persisted as strings and revived on load.
       partialize: (s) => ({
-        currentCurry: s.currentCurry.toString(),
-        totalCurryAllTime: s.totalCurryAllTime.toString(),
-        weekCurry: s.weekCurry.toString(),
-        highScore: s.highScore.toString(),
-        todayCurry: s.todayCurry.toString(),
-        autoProduction: s.autoProduction.toString(),
+        currentCurry: s.currentCurry,
+        totalCurryAllTime: s.totalCurryAllTime,
+        weekCurry: s.weekCurry,
+        highScore: s.highScore,
+        todayCurry: s.todayCurry,
+        autoProduction: s.autoProduction,
         clicksThisWeek: s.clicksThisWeek,
         sfxOn: s.sfxOn,
         musicOn: s.musicOn,
@@ -858,17 +883,20 @@ export const useGameStore = create<GameState>()(
       }),
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Record<string, unknown>;
-        const dec = (v: unknown, fallback = "0") =>
-          new Decimal((v as string) ?? fallback);
+        // Older saves stored these as Decimal strings; Number() covers both.
+        const num = (v: unknown) => Number(v ?? 0);
         return {
           ...current,
           ...(p as object),
-          currentCurry: dec(p.currentCurry),
-          totalCurryAllTime: dec(p.totalCurryAllTime),
-          weekCurry: dec(p.weekCurry),
-          highScore: dec(p.highScore),
-          todayCurry: dec(p.todayCurry),
-          autoProduction: dec(p.autoProduction),
+          currentCurry: num(p.currentCurry),
+          totalCurryAllTime: num(p.totalCurryAllTime),
+          weekCurry: num(p.weekCurry),
+          highScore: num(p.highScore),
+          todayCurry: num(p.todayCurry),
+          autoProduction: num(p.autoProduction),
+          dailySnapshots: ((p.dailySnapshots as DailySnapshot[]) ?? []).map(
+            (snap) => ({ ...snap, curry: Number(snap.curry) }),
+          ),
         } as GameState;
       },
       // Recompute derived economy values from owned items after load.

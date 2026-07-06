@@ -67,6 +67,33 @@ export const FRANCHISE_UPGRADES: FranchiseUpgrade[] = [
     tier: 1,
     effect: { type: "ingredient_set", set: "royal" },
   },
+  {
+    id: "set_himalayan",
+    name: "Himalayan Set",
+    icon: "landscape",
+    description: "Unlock 5 mountain ingredients",
+    cost: 10,
+    tier: 1,
+    effect: { type: "ingredient_set", set: "himalayan" },
+  },
+  {
+    id: "set_tandoor",
+    name: "Tandoor Set",
+    icon: "local_fire_department",
+    description: "Unlock 5 clay-oven ingredients",
+    cost: 12,
+    tier: 1,
+    effect: { type: "ingredient_set", set: "tandoor" },
+  },
+  {
+    id: "set_mithai",
+    name: "Mithai Set",
+    icon: "cake",
+    description: "Unlock 5 dessert ingredients",
+    cost: 15,
+    tier: 1,
+    effect: { type: "ingredient_set", set: "mithai" },
+  },
   // Head Start — curry granted at the start of each week.
   {
     id: "head_start_1",

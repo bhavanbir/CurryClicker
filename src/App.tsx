@@ -18,6 +18,7 @@ import { WeekSummaryModal } from "./components/WeekSummaryModal";
 import { RewardsLayer } from "./components/RewardsLayer";
 import { ShopNotifier } from "./components/ShopNotifier";
 import { ShopDrawer } from "./components/ShopDrawer";
+import { ChefSpecialPanel } from "./components/ChefSpecialPanel";
 import { Onboarding } from "./components/Onboarding";
 import {
   setSfxEnabled,
@@ -99,6 +100,7 @@ export default function App() {
 
       {phase === "week_summary" && <WeekSummaryModal onNavigate={setScreen} />}
       <RewardsLayer />
+      <ChefSpecialPanel onMixIn={() => setScreen("kitchen")} />
       <ShopDrawer
         open={shopOpen}
         onOpen={() => setShopOpen(true)}

@@ -12,14 +12,14 @@ const ROWS = 2;
 /** how many curry dishes fit on the counter before it's full */
 export const COUNTER_CAPACITY = COLS * ROWS;
 
-// Counter slab, in scene-rect %. Back edge meets the dining floor; front edge is
-// the bottom of the scene. Wider at the front for a looking-down perspective.
+// Counter slab, in scene-rect %. Flat rectangle facing the player: back edge
+// meets the dining floor; front edge is the bottom of the scene.
 const BACK_Y = 70;
 const FRONT_Y = 99;
 const BACK_L = 6;
 const BACK_R = 94;
-const FRONT_L = -2;
-const FRONT_R = 102;
+const FRONT_L = BACK_L;
+const FRONT_R = BACK_R;
 
 // Inset band where dishes actually sit.
 const DISH_BACK_Y = 74;
@@ -51,8 +51,6 @@ function slot(i: number): Slot {
   };
 }
 
-const SLAB_CLIP = `polygon(${BACK_L}% ${BACK_Y}%, ${BACK_R}% ${BACK_Y}%, ${FRONT_R}% ${FRONT_Y}%, ${FRONT_L}% ${FRONT_Y}%)`;
-
 export function Counter({ count, skin = "default" }: { count: number; skin?: SceneSkin }) {
   const dishes = Math.min(count, COUNTER_CAPACITY);
   const pal = SKINS[skin];
@@ -61,11 +59,15 @@ export function Counter({ count, skin = "default" }: { count: number; skin?: Sce
     <div className="pointer-events-none absolute inset-0">
       {/* counter surface */}
       <div
-        className="absolute inset-0"
+        className="absolute"
         style={{
           zIndex: 2000,
-          clipPath: SLAB_CLIP,
+          top: `${BACK_Y}%`,
+          bottom: `${100 - FRONT_Y}%`,
+          left: `${BACK_L}%`,
+          width: `${BACK_R - BACK_L}%`,
           background: `linear-gradient(${pal.counterFrom}, ${pal.counterTo})`,
+          boxShadow: "0 -6px 14px rgba(0, 0, 0, 0.25)",
         }}
       />
       {/* back edge line where the counter meets the floor */}

@@ -3,14 +3,10 @@ import { motion } from "framer-motion";
 import { useGameStore } from "../store/useGameStore";
 import { formatScore } from "../lib/format";
 
-interface Props {
-  showHighScore?: boolean;
-}
-
 // Big stroked arcade score. Pulses on change by re-mounting via `key`.
 // Tapping the "High" line opens a small popover explaining why the current
 // score and the high score drift apart.
-export function ScoreDisplay({ showHighScore = true }: Props) {
+export function ScoreDisplay() {
   const currentCurry = useGameStore((s) => s.currentCurry);
   const weekCurry = useGameStore((s) => s.weekCurry);
   const highScore = useGameStore((s) => s.highScore);
@@ -31,16 +27,14 @@ export function ScoreDisplay({ showHighScore = true }: Props) {
       >
         {text}
       </motion.span>
-      {showHighScore && (
-        <button
-          type="button"
-          onClick={() => setOpen((o) => !o)}
-          title="What does High mean?"
-          className="mt-0.5 text-[10px] font-bold uppercase tracking-widest text-ink/55 underline decoration-dotted underline-offset-2"
-        >
-          High {formatScore(highScore)}
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        title="What does High mean?"
+        className="mt-0.5 text-[10px] font-bold uppercase tracking-widest text-ink/55 underline decoration-dotted underline-offset-2"
+      >
+        High {formatScore(highScore)}
+      </button>
 
       {open && (
         <>

@@ -60,15 +60,13 @@ export function ProfileScreen({ onNavigate }: Props) {
         <Stat icon="touch_app" value={clicksThisWeek.toLocaleString()} label="Cooks / Week" />
         <Stat icon="calendar_today" value={`${currentDay}/7`} label="Current Day" />
         <Stat icon="restaurant_menu" value={recipesFound.toString()} label="Recipes Found" />
-        <ArcadePanel shadow="md" className="flex flex-col items-start gap-1 p-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg border-2 border-ink bg-violet-100">
-            <Icon name="stars" fill size={18} className="text-violet-600" />
-          </div>
-          <span className="font-display text-xl font-black tabular-nums text-ink">
-            {franchiseStarsEarned.toLocaleString()}
-          </span>
-          <span className="text-xs font-bold text-ink/55">Lifetime Stars</span>
-        </ArcadePanel>
+        <Stat
+          icon="stars"
+          value={franchiseStarsEarned.toLocaleString()}
+          label="Lifetime Stars"
+          iconBox="bg-violet-100"
+          iconColor="text-violet-600"
+        />
         <ArcadeButton
           className="h-full justify-center"
           size="lg"
@@ -120,11 +118,23 @@ export function ProfileScreen({ onNavigate }: Props) {
   );
 }
 
-function Stat({ icon, value, label }: { icon: string; value: string; label: string }) {
+function Stat({
+  icon,
+  value,
+  label,
+  iconBox = "bg-tertiary-fixed",
+  iconColor = "text-primary",
+}: {
+  icon: string;
+  value: string;
+  label: string;
+  iconBox?: string;
+  iconColor?: string;
+}) {
   return (
     <ArcadePanel shadow="md" className="flex flex-col items-start gap-1 p-3">
-      <div className="flex h-8 w-8 items-center justify-center rounded-lg border-2 border-ink bg-tertiary-fixed">
-        <Icon name={icon} fill size={18} className="text-primary" />
+      <div className={`flex h-8 w-8 items-center justify-center rounded-lg border-2 border-ink ${iconBox}`}>
+        <Icon name={icon} fill size={18} className={iconColor} />
       </div>
       <span className="font-display text-xl font-black tabular-nums text-ink">{value}</span>
       <span className="text-xs font-bold text-ink/55">{label}</span>

@@ -1,7 +1,12 @@
 // Aggregates owned upgrades + decorations into the flat set of numeric effects
 // the click/auto pipelines consume. Pure: same inputs → same output.
 
-import { UPGRADE_MAP, DECORATION_MAP } from "./shopData";
+import {
+  UPGRADE_MAP,
+  DECORATION_MAP,
+  prestigeBaseClick,
+  ladleValue,
+} from "./shopData";
 import { franchiseBaseSlots, reputationMultiplier } from "./franchiseData";
 import { BASE_UNLOCKED_SLOTS, MAX_SLOTS } from "../config";
 import { IS_DEMO, DEMO_MAX_SLOTS } from "../target";
@@ -24,8 +29,9 @@ export function computeEffects(
   purchasedUpgrades: string[],
   ownedDecorations: Record<string, number>,
   franchiseUpgrades: string[] = [],
+  prestigeLevel = 0,
 ): ActiveEffects {
-  let clickMultiplier = 1;
+  let clickMultiplier = prestigeBaseClick(prestigeLevel);
   let autoCPS = 0;
   let unlockedSlots = franchiseBaseSlots(franchiseUpgrades);
   let expansionLevel = 0;
@@ -35,7 +41,7 @@ export function computeEffects(
     if (!eff) continue;
     switch (eff.type) {
       case "click_multiplier":
-        clickMultiplier *= eff.value;
+        clickMultiplier *= ladleValue(UPGRADE_MAP[id], prestigeLevel);
         break;
       case "auto_cps":
         autoCPS += eff.value;

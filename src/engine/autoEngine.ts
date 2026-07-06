@@ -4,7 +4,6 @@
 // clicking AND idle income.
 
 import type { AffinityMatrix } from "../types";
-import { Decimal } from "../lib/decimal";
 import { computeRecipeScore } from "./recipeEngine";
 import type { ActiveEffects } from "./effects";
 
@@ -12,11 +11,11 @@ export function computeAutoProduction(
   slots: (string | null)[],
   matrix: AffinityMatrix,
   effects: ActiveEffects,
-): Decimal {
+): number {
   const cps = effects.decorationCPS + effects.autoCPS;
-  if (cps <= 0) return new Decimal(0);
+  if (cps <= 0) return 0;
   const { multiplier } = computeRecipeScore(slots, matrix, {
     spicePairBonus: effects.spicePairAffinityBonus,
   });
-  return new Decimal(cps).mul(multiplier).mul(effects.globalMultiplier);
+  return cps * multiplier * effects.globalMultiplier;
 }

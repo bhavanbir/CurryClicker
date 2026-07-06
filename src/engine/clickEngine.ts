@@ -1,12 +1,11 @@
 import type { AffinityMatrix, Flavor } from "../types";
-import { Decimal } from "../lib/decimal";
 import { formatCurry } from "../lib/format";
 import { computeRecipeScore } from "./recipeEngine";
 import { INGREDIENTS } from "./ingredients";
 import { NO_EFFECTS, type ActiveEffects } from "./effects";
 
 export interface ClickResult {
-  value: Decimal;
+  value: number;
   floatLabel: string; // pre-formatted "+1.2K" for the FloatText component
   isSpecial: boolean; // Chef's Special bonus was applied this cook
 }
@@ -38,24 +37,23 @@ export function computeClickValue(
   matrix: AffinityMatrix,
   effects: ActiveEffects = NO_EFFECTS,
   mods: ClickMods = NO_MODS,
-): Decimal {
+): number {
   const score = computeRecipeScore(slots, matrix, {
     spicePairBonus: effects.spicePairAffinityBonus,
     craving: mods.craving,
   });
-  if (score.baseValue === 0) return new Decimal(0);
+  if (score.baseValue === 0) return 0;
 
   const tandoorBonus = effects.spiceClickBonusPerSpice * countSpices(slots);
 
-  return new Decimal(score.baseValue)
-    .mul(score.effectiveMultiplier)
-    .mul(effects.clickMultiplier)
-    .add(effects.decorationClickBonus)
-    .add(tandoorBonus)
-    .mul(mods.streakMultiplier)
-    .mul(mods.specialMultiplier)
-    .mul(effects.globalMultiplier)
-    .floor();
+  return Math.floor(
+    (score.baseValue * score.effectiveMultiplier * effects.clickMultiplier +
+      effects.decorationClickBonus +
+      tandoorBonus) *
+      mods.streakMultiplier *
+      mods.specialMultiplier *
+      effects.globalMultiplier,
+  );
 }
 
 export function handleClick(

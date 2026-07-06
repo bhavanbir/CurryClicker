@@ -16,7 +16,13 @@ export type Rarity = "common" | "uncommon" | "rare";
 // Purchasable ingredient sets (franchise star upgrades). Absent = base roster,
 // always available; a set id means the ingredient unlocks with that franchise
 // upgrade.
-export type IngredientSet = "coastal" | "street" | "royal";
+export type IngredientSet =
+  | "coastal"
+  | "street"
+  | "royal"
+  | "himalayan"
+  | "tandoor"
+  | "mithai";
 
 export interface Ingredient {
   id: string;
@@ -70,7 +76,7 @@ export interface RecipeScore {
 
 export interface DailySnapshot {
   day: number;
-  curry: string; // Decimal serialised as string
+  curry: number;
   clicks: number;
   tierAtDayEnd: RecipeTier; // best/active recipe tier when the day rolled over
 }

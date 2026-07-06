@@ -1,97 +1,36 @@
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useGameStore } from "../store/useGameStore";
 import { useRecipeScore } from "../hooks/useRecipeScore";
-import { getDailySpecial, getDailyCraving } from "../engine/weekEngine";
+import { getDailyCraving } from "../engine/weekEngine";
 import { CRAVING_MATCH_BONUS } from "../engine/recipeEngine";
-import { INGREDIENTS } from "../engine/ingredients";
+import type { CrazyCurryEvent } from "../hooks/useCrazyCurry";
 import { FLAVOR_META } from "./FlavorTag";
 import { Icon } from "./arcade/Icon";
 
 interface Props {
-  onMixIn?: () => void; // navigate to the Kitchen
+  event: CrazyCurryEvent | null;
+  nextEventAt: number | null;
 }
 
-// Merged Chef's Special + Town Craving strip. Each half quiets down to a slim
-// green "done" row once its bonus is secured, so the strip stops shouting.
-export function TodayStrip({ onMixIn }: Props) {
+// Town Craving + Crazy Curry countdown strip. (Chef's Special moved to the
+// ChefSpecialPanel by the shop drawer.) The craving half quiets down to a slim
+// green "done" row once matched.
+export function TodayStrip({ event, nextEventAt }: Props) {
   const currentDay = useGameStore((s) => s.currentDay);
   const seed = useGameStore((s) => s.seed);
-  const slots = useGameStore((s) => s.slots);
-  const claimDays = useGameStore((s) => s.specialClaimDays);
   const score = useRecipeScore();
-
-  const special = getDailySpecial(currentDay, seed);
-  const a = INGREDIENTS[special.ingredientA];
-  const b = INGREDIENTS[special.ingredientB];
-  const hasSpecial = Boolean(a && b);
 
   const craving = getDailyCraving(currentDay, seed);
   const cravingMeta = FLAVOR_META[craving];
-
-  const bothActive =
-    slots.includes(special.ingredientA) && slots.includes(special.ingredientB);
-  const claimed = claimDays.includes(currentDay);
   const matched = score.flavor !== null && score.flavor === craving;
 
   return (
-    <div
-      className={`arcade-box grid overflow-hidden ${hasSpecial ? "sm:grid-cols-2" : ""}`}
-    >
-      {hasSpecial && (
-        <div
-          className={`flex min-h-[3rem] items-center px-3 py-2 ${
-            claimed ? "bg-buy/20" : bothActive ? "bg-primary/15" : "bg-tertiary-fixed"
-          }`}
-        >
-          {claimed ? (
-            <Done label="Special claimed" />
-          ) : (
-            <motion.div
-              key={bothActive ? "active" : "idle"}
-              initial={{ opacity: 0, scale: 0.97 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="flex w-full items-center justify-between gap-2"
-            >
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-1.5">
-                  <Icon name="star" fill size={14} className="text-primary" />
-                  <span className="font-display text-[11px] font-black uppercase tracking-wide text-ink">
-                    Chef's Special
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Pill icon={a.icon} color={a.color} name={a.name} />
-                  <Icon name="add" size={12} className="text-ink/50" />
-                  <Pill icon={b.icon} color={b.color} name={b.name} />
-                  <span className="rounded border-2 border-ink bg-white px-1.5 py-0.5 text-xs font-black text-primary">
-                    ×2
-                  </span>
-                </div>
-              </div>
-
-              {bothActive ? (
-                <span className="flex shrink-0 items-center gap-1 rounded border-2 border-ink bg-primary px-2 py-1 text-xs font-black uppercase text-white">
-                  <Icon name="check" size={14} /> In recipe
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  onClick={onMixIn}
-                  className="arcade-btn shrink-0 bg-primary px-2.5 py-1.5 text-xs uppercase text-white"
-                >
-                  Mix it in
-                  <Icon name="arrow_forward" size={14} />
-                </button>
-              )}
-            </motion.div>
-          )}
-        </div>
-      )}
-
+    <div className="arcade-box grid overflow-hidden sm:grid-cols-2">
       <div
         className={`flex min-h-[3rem] items-center px-3 py-2 ${
-          hasSpecial ? "border-t-4 border-ink sm:border-l-4 sm:border-t-0" : ""
-        } ${matched ? "bg-buy/20" : "bg-cream-100"}`}
+          matched ? "bg-buy/20" : "bg-cream-100"
+        }`}
       >
         {matched ? (
           <Done label="Craving matched" />
@@ -117,6 +56,56 @@ export function TodayStrip({ onMixIn }: Props) {
           </div>
         )}
       </div>
+
+      <CrazyCountdown event={event} nextEventAt={nextEventAt} />
+    </div>
+  );
+}
+
+// Countdown to the next Crazy Curry rush. Display-only local ticker.
+function CrazyCountdown({ event, nextEventAt }: Props) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (nextEventAt === null) return;
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [nextEventAt]);
+
+  const secondsLeft =
+    nextEventAt !== null ? Math.max(0, Math.ceil((nextEventAt - now) / 1000)) : null;
+
+  return (
+    <div
+      className={`flex min-h-[3rem] items-center border-t-4 border-ink px-3 py-2 sm:border-l-4 sm:border-t-0 ${
+        event ? "bg-curry-yellow/40" : "bg-cream-100"
+      }`}
+    >
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-1.5">
+          <Icon name="local_fire_department" fill size={14} className="text-tier-terrible" />
+          <span className="font-display text-[11px] font-black uppercase tracking-wide text-ink">
+            Crazy Curry
+          </span>
+        </div>
+        {event ? (
+          <motion.span
+            initial={{ scale: 0.9 }}
+            animate={{ scale: 1 }}
+            className="rounded border-2 border-ink bg-white px-1.5 py-0.5 text-xs font-black uppercase text-primary"
+          >
+            Live! ×{event.mult}
+          </motion.span>
+        ) : secondsLeft !== null ? (
+          <span className="text-xs font-bold tabular-nums text-ink/70">
+            Next rush in {secondsLeft}s
+          </span>
+        ) : (
+          <span className="text-xs font-bold text-ink/50">
+            Start cooking to trigger rushes
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -133,14 +122,5 @@ function Done({ label }: { label: string }) {
         {label}
       </span>
     </motion.div>
-  );
-}
-
-function Pill({ icon, color, name }: { icon: string; color: string; name: string }) {
-  return (
-    <span className="flex items-center gap-1 rounded-md border-2 border-ink bg-white px-1.5 py-0.5 text-xs font-bold text-ink">
-      <Icon name={icon} className={color} fill size={14} />
-      {name}
-    </span>
   );
 }

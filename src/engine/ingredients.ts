@@ -63,6 +63,27 @@ export const INGREDIENT_LIST: Ingredient[] = [
   { id: "rose_petals", name: "Rose Petals", icon: "filter_vintage", color: "text-pink-400", baseValue: 8, category: "herb", flavor: "mild", rarity: "uncommon", description: "Dried blushes from the royal garden.", set: "royal" },
   { id: "dried_apricot", name: "Dried Apricot", icon: "brightness_1", color: "text-orange-400", baseValue: 8, category: "vegetable", flavor: "sweet", rarity: "uncommon", description: "Amber jewels that melt into the gravy.", set: "royal" },
   { id: "white_pepper", name: "White Pepper", icon: "adjust", color: "text-stone-300", baseValue: 10, category: "spice", flavor: "spicy", rarity: "rare", description: "Refined heat that never shows its hand.", set: "royal" },
+
+  // --- Himalayan Set (46–50, franchise: set_himalayan) ---
+  { id: "yak_butter", name: "Yak Butter", icon: "opacity", color: "text-amber-200", baseValue: 7, category: "dairy", flavor: "mild", rarity: "uncommon", description: "Churned at altitude, rich as the mountain air is thin.", set: "himalayan" },
+  { id: "black_cardamom", name: "Black Cardamom", icon: "eco", color: "text-stone-800", baseValue: 9, category: "spice", flavor: "unique", rarity: "rare", description: "Smoked over open fires, dark cousin of the green pod.", set: "himalayan" },
+  { id: "timur_pepper", name: "Timur Pepper", icon: "flare", color: "text-rose-700", baseValue: 10, category: "spice", flavor: "spicy", rarity: "rare", description: "Numbing Nepali berry that makes lips tingle.", set: "himalayan" },
+  { id: "buckwheat", name: "Buckwheat", icon: "grain", color: "text-stone-500", baseValue: 5, category: "vegetable", flavor: "savory", rarity: "common", description: "Hardy highland grain, toasty and honest.", set: "himalayan" },
+  { id: "juniper_berry", name: "Juniper Berry", icon: "forest", color: "text-indigo-600", baseValue: 6, category: "herb", flavor: "unique", rarity: "uncommon", description: "Piney mountain berries crushed into the pot.", set: "himalayan" },
+
+  // --- Tandoor Set (51–55, franchise: set_tandoor) ---
+  { id: "charcoal_smoke", name: "Charcoal Smoke", icon: "air", color: "text-gray-600", baseValue: 8, category: "spice", flavor: "unique", rarity: "rare", description: "A glowing coal dropped in ghee — dhungar magic.", set: "tandoor" },
+  { id: "naan_crisp", name: "Naan Crisp", icon: "bakery_dining", color: "text-amber-300", baseValue: 4, category: "dairy", flavor: "mild", rarity: "common", description: "Blistered flatbread shards from the clay wall.", set: "tandoor" },
+  { id: "kasuri_methi", name: "Kasuri Methi", icon: "compost", color: "text-green-700", baseValue: 7, category: "herb", flavor: "savory", rarity: "uncommon", description: "Dried fenugreek leaves, crumbled over everything rich.", set: "tandoor" },
+  { id: "black_salt", name: "Black Salt", icon: "ac_unit", color: "text-purple-900", baseValue: 5, category: "vegetable", flavor: "savory", rarity: "common", description: "Sulphurous kala namak with volcanic attitude.", set: "tandoor" },
+  { id: "tandoori_paneer", name: "Tandoori Paneer", icon: "kebab_dining", color: "text-orange-500", baseValue: 7, category: "protein", flavor: "savory", rarity: "uncommon", description: "Charred cubes straight off the skewer.", set: "tandoor" },
+
+  // --- Mithai Set (56–60, franchise: set_mithai) ---
+  { id: "khoya", name: "Khoya", icon: "cloud", color: "text-stone-200", baseValue: 8, category: "dairy", flavor: "sweet", rarity: "uncommon", description: "Milk simmered down to its sweetest self.", set: "mithai" },
+  { id: "pistachio", name: "Pistachio", icon: "lens", color: "text-green-400", baseValue: 7, category: "protein", flavor: "sweet", rarity: "uncommon", description: "Emerald slivers crowning every sweet.", set: "mithai" },
+  { id: "rose_syrup", name: "Rose Syrup", icon: "water_drop", color: "text-pink-500", baseValue: 6, category: "vegetable", flavor: "sweet", rarity: "common", description: "Ruby-red rooh afza, summer in a bottle.", set: "mithai" },
+  { id: "cardamom_sugar", name: "Cardamom Sugar", icon: "auto_awesome", color: "text-emerald-300", baseValue: 9, category: "spice", flavor: "sweet", rarity: "rare", description: "Fragrant crystals that perfume the whole tray.", set: "mithai" },
+  { id: "saffron_milk", name: "Saffron Milk", icon: "wb_sunny", color: "text-yellow-400", baseValue: 10, category: "dairy", flavor: "unique", rarity: "rare", description: "Golden kesar doodh, dessert's finishing touch.", set: "mithai" },
 ];
 
 export const FLAVORS: Flavor[] = ["spicy", "mild", "sweet", "savory", "unique"];

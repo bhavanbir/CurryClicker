@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import { motion } from "framer-motion";
-import { Decimal } from "../lib/decimal";
 import { playWeekComplete, playStarAward } from "../lib/sfx";
 import { formatCurry } from "../lib/format";
 import { useGameStore } from "../store/useGameStore";
@@ -29,12 +28,9 @@ export function WeekSummaryModal({ onNavigate }: Props) {
     return () => clearTimeout(id);
   }, []);
 
-  const bestDay = snapshots.reduce<{ day: number; curry: Decimal } | null>(
-    (best, snap) => {
-      const c = new Decimal(snap.curry);
-      if (!best || c.gt(best.curry)) return { day: snap.day, curry: c };
-      return best;
-    },
+  const bestDay = snapshots.reduce<{ day: number; curry: number } | null>(
+    (best, snap) =>
+      !best || snap.curry > best.curry ? { day: snap.day, curry: snap.curry } : best,
     null,
   );
 
@@ -110,7 +106,7 @@ export function WeekSummaryModal({ onNavigate }: Props) {
             >
               <span className="font-semibold text-ink/60">Day {snap.day}</span>
               <span className="font-display font-extrabold tabular-nums text-ink">
-                {formatCurry(new Decimal(snap.curry), 1)}
+                {formatCurry(snap.curry, 1)}
               </span>
             </div>
           ))}

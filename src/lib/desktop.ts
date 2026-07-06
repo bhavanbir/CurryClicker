@@ -6,7 +6,6 @@ export interface DesktopBridge {
   writeSave(data: string): Promise<void>;
   unlockAchievement(id: string): Promise<boolean>;
   submitWeekScore(value: number): Promise<boolean>;
-  isSteamAvailable(): Promise<boolean>;
 }
 
 declare global {

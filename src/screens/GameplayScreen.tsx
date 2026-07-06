@@ -44,7 +44,9 @@ export function GameplayScreen({ onNavigate }: Props) {
   const claimSpecial = useGameStore((s) => s.claimSpecial);
   const logCook = useGameStore((s) => s.logCook);
   const dayStarted = useGameStore((s) => s.dayStarted);
+  const dayPaused = useGameStore((s) => s.dayPaused);
   const startDay = useGameStore((s) => s.startDay);
+  const togglePause = useGameStore((s) => s.togglePause);
   const weeksCompleted = useGameStore((s) => s.weeksCompleted);
   const totalCurryAllTime = useGameStore((s) => s.totalCurryAllTime);
   const highestTierSeen = useGameStore((s) => s.highestTierSeen);
@@ -75,15 +77,15 @@ export function GameplayScreen({ onNavigate }: Props) {
 
   const perCook = handleClick(slots, getAffinityData(seed).matrix, effects, mods).value;
 
-  const crazy = useCrazyCurry(hasRecipe && dayStarted && !demoEnded);
+  const crazy = useCrazyCurry(hasRecipe && dayStarted && !dayPaused && !demoEnded);
 
   function cook(x: number, y: number) {
-    if (!hasRecipe || !dayStarted) return; // shop is closed until the day opens
+    if (!hasRecipe || !dayStarted || dayPaused) return; // shop closed or paused
     const result = handleClick(slots, getAffinityData(seed).matrix, effects, mods);
-    if (result.value.lte(0)) return;
+    if (result.value <= 0) return;
 
     const crazyMult = crazy.registerCook();
-    const value = crazyMult > 1 ? result.value.mul(crazyMult) : result.value;
+    const value = crazyMult > 1 ? result.value * crazyMult : result.value;
 
     addCurry(value);
     registerClick();
@@ -136,7 +138,21 @@ export function GameplayScreen({ onNavigate }: Props) {
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <StatChip icon="calendar_today" label="Day" value={`${currentDay}/7`} />
+        <div className="flex items-center gap-1.5">
+          <StatChip icon="calendar_today" label="Day" value={`${currentDay}/7`} />
+          {dayStarted && (
+            <button
+              type="button"
+              onClick={togglePause}
+              aria-label={dayPaused ? "Resume day" : "Pause day"}
+              className={`flex h-9 w-9 items-center justify-center rounded-lg border-2 border-ink shadow-arcade-sm transition-transform hover:-translate-y-0.5 ${
+                dayPaused ? "bg-primary text-white" : "bg-white text-ink"
+              }`}
+            >
+              <Icon name={dayPaused ? "play_arrow" : "pause"} fill size={20} />
+            </button>
+          )}
+        </div>
         <ScoreDisplay />
         {streakDays >= 2 ? (
           <StatChip icon="whatshot" label="Streak" value={`${streakMult.toFixed(2)}×`} />
@@ -147,14 +163,14 @@ export function GameplayScreen({ onNavigate }: Props) {
 
       <DayProgressBar />
 
-      <TodayStrip onMixIn={() => onNavigate("kitchen")} />
+      <TodayStrip event={crazy.event} nextEventAt={crazy.nextEventAt} />
 
       {/* Restaurant scene + floats */}
       <div ref={sceneWrapRef} className="relative">
         <RestaurantScene
           cookSignal={cookSignal}
           onCook={cook}
-          busy={hasRecipe && dayStarted}
+          busy={hasRecipe && dayStarted && !dayPaused}
           cravingMatched={score.cravingMatched ?? false}
         />
         <AnimatePresence>
@@ -281,13 +297,15 @@ export function GameplayScreen({ onNavigate }: Props) {
             only starts when the player presses Start Day. */}
         <ArcadeButton
           size="xl"
-          variant={!hasRecipe ? "tertiary" : !dayStarted ? "buy" : "primary"}
+          variant={!hasRecipe ? "tertiary" : !dayStarted || dayPaused ? "buy" : "primary"}
           onClick={
             !hasRecipe
               ? () => onNavigate("kitchen")
               : !dayStarted
                 ? startDay
-                : cookFromButton
+                : dayPaused
+                  ? togglePause
+                  : cookFromButton
           }
         >
           {!hasRecipe ? (
@@ -299,6 +317,11 @@ export function GameplayScreen({ onNavigate }: Props) {
             <>
               <Icon name="play_arrow" fill size={28} />
               Start Day {currentDay}
+            </>
+          ) : dayPaused ? (
+            <>
+              <Icon name="play_arrow" fill size={28} />
+              Resume Day
             </>
           ) : (
             <>

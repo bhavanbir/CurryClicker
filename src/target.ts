@@ -11,7 +11,7 @@
 //
 // Everything else (the whole single-player loop) is identical across targets.
 
-export type BuildTarget = "full" | "demo";
+type BuildTarget = "full" | "demo";
 
 export const TARGET: BuildTarget =
   import.meta.env.VITE_TARGET === "demo" ? "demo" : "full";

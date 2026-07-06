@@ -5,5 +5,4 @@ contextBridge.exposeInMainWorld("curryDesktop", {
   writeSave: (data) => ipcRenderer.invoke("save:write", data),
   unlockAchievement: (id) => ipcRenderer.invoke("steam:achievement", id),
   submitWeekScore: (value) => ipcRenderer.invoke("steam:score", value),
-  isSteamAvailable: () => ipcRenderer.invoke("steam:available"),
 });

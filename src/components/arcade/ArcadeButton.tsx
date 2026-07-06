@@ -1,5 +1,4 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
-import { Icon } from "./Icon";
 
 type Variant = "primary" | "neutral" | "buy" | "tertiary" | "danger";
 type Size = "sm" | "md" | "lg" | "xl";
@@ -22,16 +21,12 @@ const SIZE: Record<Size, string> = {
 interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
   size?: Size;
-  icon?: string;
-  iconFill?: boolean;
   children?: ReactNode;
 }
 
 export function ArcadeButton({
   variant = "neutral",
   size = "md",
-  icon,
-  iconFill,
   children,
   className = "",
   type = "button",
@@ -43,7 +38,6 @@ export function ArcadeButton({
       type={type}
       className={`arcade-btn inline-flex items-center justify-center gap-2 uppercase tracking-wide ${SIZE[size]} ${VARIANT[variant]} ${className}`}
     >
-      {icon && <Icon name={icon} fill={iconFill} />}
       {children}
     </button>
   );

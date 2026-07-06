@@ -3,7 +3,6 @@
 // result into `unlockedBadges` (badges never un-earn). IAP / leaderboard badges
 // (Cosmetic Collector, Top 10 Chef) arrive with Epics D/E and are omitted here.
 
-import type { Decimal } from "../lib/decimal";
 import { TIER_ORDER } from "./recipeEngine";
 import type { RecipeTier } from "../types";
 
@@ -28,7 +27,7 @@ export const BADGES: BadgeDef[] = [
 ];
 
 export interface BadgeInput {
-  totalCurry: Decimal;
+  totalCurry: number;
   maxDayClicks: number;
   weeksCompleted: number;
   discoveredCount: number;
@@ -41,8 +40,8 @@ export interface BadgeInput {
 
 export function evaluateBadges(i: BadgeInput): string[] {
   const earned: string[] = [];
-  if (i.totalCurry.gt(0)) earned.push("spicy_boy");
-  if (i.totalCurry.gte(1_000_000)) earned.push("curry_king");
+  if (i.totalCurry > 0) earned.push("spicy_boy");
+  if (i.totalCurry >= 1_000_000) earned.push("curry_king");
   if (i.maxDayClicks >= 1000) earned.push("speedster");
   if (i.weeksCompleted >= 1) earned.push("week_warrior");
   if (i.discoveredCount >= 10) earned.push("recipe_master");

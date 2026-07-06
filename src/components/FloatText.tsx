@@ -1,5 +1,3 @@
-import { motion } from "framer-motion";
-
 export interface Float {
   id: number;
   x: number;
@@ -7,17 +5,15 @@ export interface Float {
   label: string;
 }
 
-// A single rising "+value" particle spawned at the cook position.
+// A single rising "+value" particle spawned at the cook position. Pure CSS
+// (.float-rise in index.css), same compositor-only approach as ClickBurst.
 export function FloatText({ x, y, label }: Omit<Float, "id">) {
   return (
-    <motion.div
-      initial={{ opacity: 1, y: 0, scale: 0.9 }}
-      animate={{ opacity: 0, y: -72, scale: 1.35 }}
-      transition={{ duration: 0.8, ease: "easeOut" }}
+    <div
       style={{ left: x, top: y }}
-      className="pointer-events-none absolute z-30 -translate-x-1/2 select-none font-display text-2xl font-black text-primary text-stroke-ink"
+      className="float-rise pointer-events-none absolute z-30 select-none font-display text-2xl font-black text-primary text-stroke-ink"
     >
       {label}
-    </motion.div>
+    </div>
   );
 }

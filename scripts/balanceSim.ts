@@ -46,7 +46,6 @@ async function importEngine() {
     shop,
     ingredients,
     rng,
-    decimal,
   ] = await Promise.all([
     import("../src/config"),
     import("../src/engine/affinityEngine"),
@@ -59,7 +58,6 @@ async function importEngine() {
     import("../src/engine/shopData"),
     import("../src/engine/ingredients"),
     import("../src/lib/rng"),
-    import("../src/lib/decimal"),
   ]);
   return {
     config,
@@ -73,7 +71,6 @@ async function importEngine() {
     shop,
     ingredients,
     rng,
-    decimal,
   };
 }
 
@@ -113,7 +110,6 @@ const {
 const { UPGRADES, DECORATIONS } = E.shop;
 const { INGREDIENTS } = E.ingredients;
 const { makeRng } = E.rng;
-const { Decimal } = E.decimal;
 
 type Rng = () => number;
 type Matrix = Record<string, Record<string, number>>;
@@ -378,7 +374,7 @@ const ARCHETYPES: Archetype[] = [
 // ---- shop / franchise buying ------------------------------------------------
 
 interface PlayerState {
-  curry: InstanceType<typeof Decimal>;
+  curry: number;
   purchasedUpgrades: string[];
   ownedDecorations: Record<string, number>;
   franchiseUpgrades: string[];
@@ -412,9 +408,9 @@ function buyShopGreedy(p: PlayerState): ShopBuy[] {
       options.push({ id: d.id, cost: d.cost });
     }
     options.sort((a, b) => a.cost - b.cost);
-    const pick = options.find((o) => p.curry.gte(o.cost));
+    const pick = options.find((o) => p.curry >= o.cost);
     if (!pick) break;
-    p.curry = p.curry.sub(pick.cost);
+    p.curry -= pick.cost;
     if (UPGRADES.some((u) => u.id === pick.id)) {
       p.purchasedUpgrades.push(pick.id);
     } else {
@@ -466,7 +462,7 @@ const FRANCHISE_TOTAL_COST = FRANCHISE_UPGRADES.reduce((s, u) => s + u.cost, 0);
 
 interface WeekResult {
   week: number;
-  curryEarned: InstanceType<typeof Decimal>;
+  curryEarned: number;
   shopBuys: ShopBuy[];
   shopOwned: number;
   starsEarned: number;
@@ -501,7 +497,7 @@ function simulateWeek(
   p.streakDays = 0;
   p.streakMult = 1;
   const headStart = headStartCurry(p.franchiseUpgrades);
-  if (headStart > 0) p.curry = p.curry.add(headStart);
+  if (headStart > 0) p.curry += headStart;
 
   // Journal Insight pre-reveals (mirrors store's seeded loop; we only need the count)
   const insightCount = Math.min(
@@ -531,7 +527,7 @@ function simulateWeek(
     legendary: 5,
   };
   let cravingDays = 0;
-  let weekCurry = new Decimal(0);
+  let weekCurry = 0;
   const shopBuys: ShopBuy[] = [];
   const startingStars = p.starsEarned;
 
@@ -573,12 +569,10 @@ function simulateWeek(
     });
     const auto = computeAutoProduction(slots, matrix, effects);
     const clicksPerDay = Math.round(arch.clicksPerSec * DAY_DURATION_SECONDS);
-    const dayIncome = clickValue
-      .mul(clicksPerDay)
-      .add(auto.mul(DAY_DURATION_SECONDS));
+    const dayIncome = clickValue * clicksPerDay + auto * DAY_DURATION_SECONDS;
 
-    p.curry = p.curry.add(dayIncome);
-    weekCurry = weekCurry.add(dayIncome);
+    p.curry += dayIncome;
+    weekCurry += dayIncome;
 
     // --- day-end rollover (store semantics) ---
     const score = computeRecipeScore(slots, matrix, {
@@ -638,9 +632,8 @@ function simulateWeek(
 
 // ---- run --------------------------------------------------------------------
 
-function fmt(d: InstanceType<typeof Decimal>): string {
-  const n = d.toNumber();
-  if (!isFinite(n)) return d.toExponential(2);
+function fmt(n: number): string {
+  if (!isFinite(n)) return n.toExponential(2);
   if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
   if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
   if (n >= 1e3) return (n / 1e3).toFixed(1) + "K";
@@ -665,14 +658,14 @@ interface ArchSummary {
   buyoutWeek: number | null;
   shopDoneWeek: number | null;
   deadZones: number[];
-  totalCurry: InstanceType<typeof Decimal>;
+  totalCurry: number;
 }
 
 const summaries: ArchSummary[] = [];
 
 for (const arch of ARCHETYPES) {
   const p: PlayerState = {
-    curry: new Decimal(0),
+    curry: 0,
     purchasedUpgrades: [],
     ownedDecorations: {},
     franchiseUpgrades: [],
@@ -703,11 +696,11 @@ for (const arch of ARCHETYPES) {
   let buyoutWeek: number | null = null;
   let shopDoneWeek: number | null = null;
   const deadZones: number[] = [];
-  let totalCurry = new Decimal(0);
+  let totalCurry = 0;
 
   for (let w = 1; w <= N_WEEKS; w++) {
     const r = simulateWeek(arch, p, w, rng);
-    totalCurry = totalCurry.add(r.curryEarned);
+    totalCurry += r.curryEarned;
     if (buyoutWeek === null && r.franchiseOwnedCount === FRANCHISE_UPGRADES.length)
       buyoutWeek = w;
     if (shopDoneWeek === null && !shopHasRemaining(p)) shopDoneWeek = w;

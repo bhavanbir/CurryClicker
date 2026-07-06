@@ -16,18 +16,15 @@
     "desktop:build": "npm run build && electron-builder"
   },
   "dependencies": {
-    "break_infinity.js": "^2.0.0",
     "framer-motion": "^11.3.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "seedrandom": "^3.0.5",
     "steamworks.js": "^0.4.0",
     "zustand": "^4.5.5"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
-    "@types/seedrandom": "^3.0.8",
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.19",
     "electron": "^31.7.7",
@@ -36,9 +33,6 @@
     "tailwindcss": "^3.4.7",
     "typescript": "^5.5.4",
     "vite": "^5.3.5"
-  },
-  "allowScripts": {
-    "esbuild@0.21.5": true
   },
   "build": {
     "appId": "com.spicetone.curryclicker",

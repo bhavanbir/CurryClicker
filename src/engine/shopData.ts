@@ -1,6 +1,6 @@
 // Shop catalogue — single source of truth for purchasable Upgrades and
-// Decorations (framework §10 / §4.6). Costs are plain numbers (curry); the
-// store spends a Decimal derived from these. IAP cosmetics stay in
+// Decorations (framework §10 / §4.6). Costs are plain numbers (curry).
+// IAP cosmetics stay in
 // data/sampleData (real-money, no gameplay effect) until Epic E.
 
 import type { Upgrade, Decoration } from "../types";
@@ -519,3 +519,46 @@ export const UPGRADE_MAP: Record<string, Upgrade> = Object.fromEntries(
 export const DECORATION_MAP: Record<string, Decoration> = Object.fromEntries(
   DECORATIONS.map((d) => [d.id, d]),
 );
+
+// --- Prestige (weekly rollover) scaling ---
+// Each completed week ("prestige") upgrades are wiped and re-bought at higher
+// prices, but every ladle — including your bare hands — cooks harder.
+// ponytail: three tuning knobs, no config system
+export const PRESTIGE_LADLE_GROWTH = 0.1; // +10% ladle power per completed week
+export const LADLE_CAP_RATIO = 2; // capped ladles top out at 2× printed value (hit at prestige 10)
+export const UPGRADE_COST_GROWTH = 1.5; // all upgrade costs ×1.5^prestige
+
+const LADLE_IDS = new Set([
+  "wooden_spoon",
+  "steel_ladle",
+  "golden_ladle",
+  "obsidian_ladle",
+  "diamond_ladle",
+  "celestial_ladle",
+]);
+
+export function prestigeLadleFactor(prestige: number): number {
+  return 1 + PRESTIGE_LADLE_GROWTH * prestige;
+}
+
+// The "default ladle" — base click multiplier with no upgrades. Capped like
+// every non-celestial ladle.
+export function prestigeBaseClick(prestige: number): number {
+  return Math.min(prestigeLadleFactor(prestige), LADLE_CAP_RATIO);
+}
+
+// Value a click_multiplier upgrade contributes at a given prestige level.
+// Knives (non-ladle ids) pass through unchanged; celestial_ladle is uncapped.
+export function ladleValue(upgrade: Upgrade, prestige: number): number {
+  const printed =
+    upgrade.effect.type === "click_multiplier" ? upgrade.effect.value : 1;
+  if (!LADLE_IDS.has(upgrade.id)) return printed;
+  const grown = printed * prestigeLadleFactor(prestige);
+  return upgrade.id === "celestial_ladle"
+    ? grown
+    : Math.min(grown, printed * LADLE_CAP_RATIO);
+}
+
+export function upgradeCost(upgrade: Upgrade, prestige: number): number {
+  return Math.round(upgrade.cost * Math.pow(UPGRADE_COST_GROWTH, prestige));
+}

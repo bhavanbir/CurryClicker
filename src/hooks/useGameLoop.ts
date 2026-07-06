@@ -17,11 +17,11 @@ export function useGameLoop() {
       last = now;
 
       const s = useGameStore.getState();
-      // Time only flows once the player has opened the day (Start Day). Auto-
-      // production also pauses until then, so nothing ticks automatically.
-      if (s.phase === "cooking" && s.dayStarted) {
-        if (s.autoProduction.gt(0)) {
-          s.addCurry(s.autoProduction.mul(deltaSec));
+      // Time only flows once the player has opened the day (Start Day) and
+      // isn't paused. Auto-production also stops, so nothing ticks.
+      if (s.phase === "cooking" && s.dayStarted && !s.dayPaused) {
+        if (s.autoProduction > 0) {
+          s.addCurry(s.autoProduction * deltaSec);
         }
         s.advanceDayProgress(deltaSec / DAY_DURATION_SECONDS);
       }

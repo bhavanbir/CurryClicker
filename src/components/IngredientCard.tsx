@@ -13,7 +13,6 @@ interface Props {
   slots: (string | null)[];
   hoveredId: string | null;
   matrix: AffinityMatrix;
-  lens?: boolean; // Affinity Lens upgrade: show exact pair affinity on hover
   onClick: () => void;
   onHover: (id: string | null) => void;
 }
@@ -51,7 +50,6 @@ export function IngredientCard({
   slots,
   hoveredId,
   matrix,
-  lens = false,
   onClick,
   onHover,
 }: Props) {
@@ -94,13 +92,6 @@ export function IngredientCard({
     );
   }
 
-  // Affinity Lens: exact pair value shown on an in-recipe card while hovering
-  // another pantry item.
-  const lensValue =
-    lens && hoveredId && hoveredId !== ingredient.id && slots.includes(ingredient.id)
-      ? (matrix[ingredient.id]?.[hoveredId] ?? 0)
-      : null;
-
   return (
     <button
       type="button"
@@ -121,19 +112,9 @@ export function IngredientCard({
         {ingredient.name}
       </span>
       <span className="text-[10px] font-bold text-ink/55">+{ingredient.baseValue}</span>
-      {inRecipe && lensValue === null && (
+      {inRecipe && (
         <span className="absolute inset-0 z-10 flex items-center justify-center bg-ink/10 text-[10px] font-extrabold uppercase tracking-wide text-ink">
           In Use
-        </span>
-      )}
-      {lensValue !== null && (
-        <span
-          className={`absolute inset-x-1 bottom-1 z-10 rounded border border-ink px-1 py-0.5 text-center text-[11px] font-black tabular-nums ${
-            lensValue > 0 ? "bg-tier-good text-ink" : lensValue < 0 ? "bg-tier-terrible text-white" : "bg-white text-ink"
-          }`}
-        >
-          {lensValue > 0 ? "+" : ""}
-          {lensValue.toFixed(2)}
         </span>
       )}
     </button>

@@ -3,7 +3,7 @@ import { formatCurry } from "../../lib/format";
 import { PRIMARY_NAV, type Screen } from "../../navigation";
 import { Icon } from "../arcade/Icon";
 import { IS_DEMO } from "../../target";
-import logoUrl from "../../assets/logo.png";
+import logoUrl from "../../assets/logo_chili.png";
 
 interface Props {
   screen: Screen;

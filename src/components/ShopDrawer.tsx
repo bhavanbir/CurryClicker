@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useGameStore } from "../store/useGameStore";
-import { Decimal } from "../lib/decimal";
 import { formatCurry } from "../lib/format";
-import { UPGRADES, DECORATIONS, UPGRADE_MAP } from "../engine/shopData";
+import { UPGRADES, DECORATIONS, UPGRADE_MAP, upgradeCost } from "../engine/shopData";
 import { COSMETICS } from "../data/sampleData";
 import type { Upgrade, Decoration } from "../types";
 import { Icon } from "./arcade/Icon";
@@ -19,6 +18,47 @@ import { SteamLockChip } from "./SteamCta";
 
 type Tab = "upgrades" | "decor" | "cosmetics";
 
+// Static catalogue → static grouping, so upgrades are findable by type.
+const UPGRADE_GROUPS: { label: string; ids: string[] }[] = [
+  {
+    label: "Ladles",
+    ids: [
+      "wooden_spoon",
+      "steel_ladle",
+      "golden_ladle",
+      "obsidian_ladle",
+      "diamond_ladle",
+      "celestial_ladle",
+    ],
+  },
+  { label: "Knives", ids: ["chefs_knife", "damascus_knife", "legendary_cleaver"] },
+  {
+    label: "Kitchen Crew",
+    ids: [
+      "sous_chef",
+      "kitchen_brigade",
+      "industrial_pot",
+      "curry_conveyor",
+      "robot_kitchen",
+      "curry_megaworks",
+    ],
+  },
+  { label: "Delivery", ids: ["delivery_bicycle", "delivery_scooter", "delivery_fleet"] },
+  {
+    label: "Slots & Expansion",
+    ids: ["slot_4", "slot_5", "expand_1", "expand_2", "expand_3", "expand_4", "expand_5"],
+  },
+];
+
+if (import.meta.env.DEV) {
+  // A new upgrade must be added to a group or it silently vanishes from the shop.
+  const grouped = new Set(UPGRADE_GROUPS.flatMap((g) => g.ids));
+  const missing = UPGRADES.filter((u) => !grouped.has(u.id)).map((u) => u.id);
+  if (missing.length > 0 || grouped.size !== UPGRADES.length) {
+    throw new Error(`UPGRADE_GROUPS out of sync with UPGRADES: missing [${missing}]`);
+  }
+}
+
 export function ShopDrawer({
   open,
   onOpen,
@@ -31,6 +71,7 @@ export function ShopDrawer({
   const currentCurry = useGameStore((s) => s.currentCurry);
   const purchasedUpgrades = useGameStore((s) => s.purchasedUpgrades);
   const ownedDecorations = useGameStore((s) => s.ownedDecorations);
+  const weeksCompleted = useGameStore((s) => s.weeksCompleted);
   const purchaseUpgrade = useGameStore((s) => s.purchaseUpgrade);
   const purchaseDecoration = useGameStore((s) => s.purchaseDecoration);
 
@@ -141,33 +182,58 @@ export function ShopDrawer({
               {/* Items */}
               <div className="flex flex-1 flex-col gap-3 overflow-y-auto overscroll-contain px-4 py-4">
                 {tab === "upgrades" &&
-                  UPGRADES.map((u) => {
-                    const owned = purchasedUpgrades.includes(u.id);
-                    const prereqMet =
-                      !u.prerequisiteUpgradeId ||
-                      purchasedUpgrades.includes(u.prerequisiteUpgradeId);
+                  UPGRADE_GROUPS.map((group) => {
+                    const items = group.ids.map((id) => UPGRADE_MAP[id]);
+                    const ownedInGroup = items.filter((u) =>
+                      purchasedUpgrades.includes(u.id),
+                    ).length;
                     return (
-                      <ShopCard
-                        key={u.id}
-                        item={u}
-                        cost={u.cost}
-                        statusLabel={owned ? "Owned" : undefined}
-                        owned={owned}
-                        lockedReason={
-                          !owned && !prereqMet
-                            ? `Requires ${UPGRADE_MAP[u.prerequisiteUpgradeId!]?.name ?? "previous upgrade"}`
-                            : undefined
-                        }
-                        steamLocked={IS_DEMO && u.id === "slot_5"}
-                        currentCurry={currentCurry}
-                        onBuy={() => {
-                          if (purchaseUpgrade(u.id)) {
-                            playPurchase();
-                            return true;
-                          }
-                          return false;
-                        }}
-                      />
+                      <details key={group.label} open className="group/section">
+                        <summary className="flex cursor-pointer select-none items-center justify-between rounded-lg border-2 border-ink bg-white px-3 py-2 text-sm font-black uppercase tracking-wide text-ink shadow-arcade-sm [&::-webkit-details-marker]:hidden">
+                          <span className="flex items-center gap-1.5">
+                            <Icon
+                              name="chevron_right"
+                              size={18}
+                              className="transition-transform group-open/section:rotate-90"
+                            />
+                            {group.label}
+                          </span>
+                          <span className="text-[10px] font-bold text-ink/45">
+                            {ownedInGroup}/{items.length}
+                          </span>
+                        </summary>
+                        <div className="mt-3 flex flex-col gap-3">
+                          {items.map((u) => {
+                            const owned = purchasedUpgrades.includes(u.id);
+                            const prereqMet =
+                              !u.prerequisiteUpgradeId ||
+                              purchasedUpgrades.includes(u.prerequisiteUpgradeId);
+                            return (
+                              <ShopCard
+                                key={u.id}
+                                item={u}
+                                cost={upgradeCost(u, weeksCompleted)}
+                                statusLabel={owned ? "Owned" : undefined}
+                                owned={owned}
+                                lockedReason={
+                                  !owned && !prereqMet
+                                    ? `Requires ${UPGRADE_MAP[u.prerequisiteUpgradeId!]?.name ?? "previous upgrade"}`
+                                    : undefined
+                                }
+                                steamLocked={IS_DEMO && u.id === "slot_5"}
+                                currentCurry={currentCurry}
+                                onBuy={() => {
+                                  if (purchaseUpgrade(u.id)) {
+                                    playPurchase();
+                                    return true;
+                                  }
+                                  return false;
+                                }}
+                              />
+                            );
+                          })}
+                        </div>
+                      </details>
                     );
                   })}
 
@@ -291,14 +357,14 @@ function ShopCard({
   owned: boolean;
   lockedReason?: string;
   steamLocked?: boolean;
-  currentCurry: Decimal;
+  currentCurry: number;
   onBuy: () => boolean;
 }) {
   const [justBought, setJustBought] = useState(false);
   const locked = !!lockedReason || steamLocked;
-  const affordable = currentCurry.gte(new Decimal(cost));
+  const affordable = currentCurry >= cost;
   const buyable = !owned && !locked && affordable;
-  const shortfall = new Decimal(cost).sub(currentCurry);
+  const shortfall = cost - currentCurry;
 
   const handleBuy = () => {
     if (!onBuy()) return;
@@ -374,7 +440,7 @@ function ShopCard({
                 size={16}
                 className={buyable ? "text-primary" : "text-ink/40"}
               />
-              {formatCurry(new Decimal(cost), 0)}
+              {formatCurry(cost, 0)}
             </span>
             <span className="text-sm font-black uppercase tracking-wider">
               {buyable ? "Buy" : `Need ${formatCurry(shortfall, 0)} more`}

@@ -24,6 +24,7 @@ export interface CrazyCurryEvent {
 
 export function useCrazyCurry(active: boolean) {
   const [event, setEvent] = useState<CrazyCurryEvent | null>(null);
+  const [nextEventAt, setNextEventAt] = useState<number | null>(null);
   const [onPace, setOnPace] = useState(false);
   const clicksRef = useRef<number[]>([]);
   const eventRef = useRef(event);
@@ -32,14 +33,17 @@ export function useCrazyCurry(active: boolean) {
   useEffect(() => {
     if (!active) {
       setEvent(null);
+      setNextEventAt(null);
       return;
     }
     let timer: number;
     const schedule = () => {
       const gap = MIN_GAP_MS + Math.random() * (MAX_GAP_MS - MIN_GAP_MS);
+      setNextEventAt(Date.now() + gap);
       timer = window.setTimeout(() => {
         const tier = TIERS[Math.floor(Math.random() * TIERS.length)];
         setOnPace(false);
+        setNextEventAt(null);
         setEvent({ ...tier, startedAt: Date.now(), durationMs: EVENT_MS });
         playStarAward();
         timer = window.setTimeout(() => {
@@ -71,5 +75,5 @@ export function useCrazyCurry(active: boolean) {
     return ok ? ev.mult : 1;
   }
 
-  return { event, onPace, registerCook };
+  return { event, onPace, nextEventAt, registerCook };
 }

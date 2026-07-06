@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useGameStore } from "../store/useGameStore";
-import { Decimal } from "../lib/decimal";
-import { UPGRADES, DECORATIONS } from "../engine/shopData";
+import { UPGRADES, DECORATIONS, upgradeCost } from "../engine/shopData";
 import { Icon } from "./arcade/Icon";
 import { IS_DEMO, DEMO_DECORATIONS } from "../target";
 
@@ -26,6 +25,7 @@ export function ShopNotifier({ onOpenShop }: { onOpenShop: () => void }) {
   const currentCurry = useGameStore((s) => s.currentCurry);
   const purchasedUpgrades = useGameStore((s) => s.purchasedUpgrades);
   const ownedDecorations = useGameStore((s) => s.ownedDecorations);
+  const weeksCompleted = useGameStore((s) => s.weeksCompleted);
 
   const notified = useRef<Set<string>>(new Set());
   const primed = useRef(false);
@@ -38,14 +38,14 @@ export function ShopNotifier({ onOpenShop }: { onOpenShop: () => void }) {
       if (IS_DEMO && u.id === "slot_5") continue;
       if (purchasedUpgrades.includes(u.id)) continue;
       if (u.prerequisiteUpgradeId && !purchasedUpgrades.includes(u.prerequisiteUpgradeId)) continue;
-      if (currentCurry.gte(new Decimal(u.cost))) {
+      if (currentCurry >= upgradeCost(u, weeksCompleted)) {
         buyable.push({ key: u.id, name: u.name, icon: u.icon, tone: u.tone });
       }
     }
     for (const d of DECORATIONS) {
       if (IS_DEMO && !DEMO_DECORATIONS.includes(d.id)) continue;
       if ((ownedDecorations[d.id] ?? 0) >= d.maxQuantity) continue;
-      if (currentCurry.gte(new Decimal(d.cost))) {
+      if (currentCurry >= d.cost) {
         buyable.push({ key: d.id, name: d.name, icon: d.icon, tone: d.tone });
       }
     }
@@ -68,7 +68,7 @@ export function ShopNotifier({ onOpenShop }: { onOpenShop: () => void }) {
         DISMISS_MS,
       );
     });
-  }, [currentCurry, purchasedUpgrades, ownedDecorations]);
+  }, [currentCurry, purchasedUpgrades, ownedDecorations, weeksCompleted]);
 
   return (
     <div className="pointer-events-none fixed bottom-24 right-3 z-[45] flex flex-col items-end gap-2 md:bottom-4">

@@ -11,9 +11,11 @@ export function useEffects(): ActiveEffects {
   const purchasedUpgrades = useGameStore((s) => s.purchasedUpgrades);
   const ownedDecorations = useGameStore((s) => s.ownedDecorations);
   const franchiseUpgrades = useGameStore((s) => s.franchiseUpgrades);
+  const weeksCompleted = useGameStore((s) => s.weeksCompleted);
   return useMemo(
-    () => computeEffects(purchasedUpgrades, ownedDecorations, franchiseUpgrades),
-    [purchasedUpgrades, ownedDecorations, franchiseUpgrades],
+    () =>
+      computeEffects(purchasedUpgrades, ownedDecorations, franchiseUpgrades, weeksCompleted),
+    [purchasedUpgrades, ownedDecorations, franchiseUpgrades, weeksCompleted],
   );
 }
 
