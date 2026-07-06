@@ -21,3 +21,8 @@ export const MAX_SLOTS = 5;
 
 // At least this many fully-positive recipes are guaranteed each week.
 export const GUARANTEED_RECIPE_COUNT = 6;
+
+// Cooks of one recipe before its affinity pairs are "tasted" (revealed in the
+// Journal mid-day). Balance knob: lower = faster Journal fill = easier 20-pair
+// franchise star.
+export const TASTE_COOKS_TO_REVEAL = 25;

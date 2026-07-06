@@ -3,6 +3,8 @@ import { motion, useReducedMotion } from "framer-motion";
 import { useGameStore } from "../store/useGameStore";
 import { INGREDIENTS, INGREDIENT_IDS } from "../engine/ingredients";
 import { avgAffinityToTier } from "../engine/recipeEngine";
+import { COLLECTION_SETS, setProgress, type CollectionSet } from "../engine/collections";
+import { playStarAward } from "../lib/sfx";
 import { TIER_META } from "../components/AffinityBadge";
 import type { Ingredient } from "../types";
 import type { Screen } from "../navigation";
@@ -54,6 +56,13 @@ export function AffinityJournalScreen({ onNavigate }: Props) {
         }
       />
 
+      {/* Collection sets — know N pairs within each pool, claim for curry */}
+      <div className="grid grid-cols-2 gap-2">
+        {COLLECTION_SETS.map((cs) => (
+          <SetCard key={cs.id} cs={cs} />
+        ))}
+      </div>
+
       <div className="flex items-end justify-between border-b-4 border-ink pb-1">
         <h2 className="font-display text-xl font-black uppercase text-ink">
           Tested Pairs
@@ -91,6 +100,56 @@ export function AffinityJournalScreen({ onNavigate }: Props) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function SetCard({ cs }: { cs: CollectionSet }) {
+  const discoveredAffinities = useGameStore((s) => s.discoveredAffinities);
+  const claimedSets = useGameStore((s) => s.claimedSets);
+  const claimSet = useGameStore((s) => s.claimSet);
+
+  const progress = useMemo(
+    () => setProgress(cs, discoveredAffinities),
+    [cs, discoveredAffinities],
+  );
+  const claimed = claimedSets.includes(cs.id);
+  const complete = progress >= cs.target;
+
+  return (
+    <div className="arcade-box flex flex-col gap-2 p-3">
+      <div className="flex items-center gap-1.5">
+        <Icon name={cs.icon} fill size={18} className="text-primary" />
+        <span className="truncate font-display text-xs font-black uppercase text-ink">
+          {cs.name}
+        </span>
+        <span className="ml-auto shrink-0 text-xs font-bold tabular-nums text-ink/60">
+          {progress}/{cs.target}
+        </span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full border-2 border-ink bg-white">
+        <div
+          className={`h-full transition-[width] duration-300 ${complete ? "bg-buy" : "bg-curry-yellow"}`}
+          style={{ width: `${(progress / cs.target) * 100}%` }}
+        />
+      </div>
+      {claimed ? (
+        <div className="flex items-center gap-1 text-xs font-bold text-ink/50">
+          <Icon name="check_circle" fill size={14} />
+          Claimed
+        </div>
+      ) : complete ? (
+        <ArcadeButton
+          size="sm"
+          variant="buy"
+          onClick={() => {
+            claimSet(cs.id);
+            playStarAward();
+          }}
+        >
+          Claim
+        </ArcadeButton>
+      ) : null}
     </div>
   );
 }

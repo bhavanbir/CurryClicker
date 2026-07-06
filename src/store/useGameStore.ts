@@ -15,7 +15,9 @@ import {
   seedFromWeekId,
   evaluateStreak,
   getDailyCraving,
+  getWeeklyRumor,
 } from "../engine/weekEngine";
+import { COLLECTION_SET_MAP, setProgress } from "../engine/collections";
 import { getAffinityData, affinityPairKey } from "../engine/affinityEngine";
 import {
   computeRecipeScore,
@@ -35,7 +37,7 @@ import {
 } from "../engine/franchiseData";
 import { makeRng } from "../lib/rng";
 import { WALL_PLACE_ORDER } from "../scene/walls";
-import { BASE_UNLOCKED_SLOTS } from "../config";
+import { BASE_UNLOCKED_SLOTS, TASTE_COOKS_TO_REVEAL } from "../config";
 import { IS_DEMO, DEMO_DECORATIONS } from "../target";
 
 export const SAVE_KEY = "curry-clicker-save";
@@ -50,6 +52,8 @@ export interface CookOutcome {
   fingerprint: string;
   isNewDiscovery: boolean;
   needsNaming: boolean; // first great/legendary craft of this recipe
+  tastedPairs: number; // pairs newly revealed by this cook (taste-to-reveal)
+  rumorReward?: number; // curry paid out for cooking the Weekly Rumor
 }
 
 const EMPTY_SLOTS: (string | null)[] = [null, null, null, null, null];
@@ -86,6 +90,8 @@ export interface GameState {
   // Affinity Journal: pair-key (affinityPairKey) -> true affinity, filled in as
   // recipes are cooked through day-end. Undefined = pair not yet tested. Weekly.
   discoveredAffinities: Record<string, number>;
+  rumorClaimed: boolean; // this week's Rumored Recipe cooked & paid out
+  claimedSets: string[]; // collection sets claimed this week
   unlockedBadges: string[]; // cumulative, never un-earned
   weeksCompleted: number;
   maxSlotsUsed: number; // most slots in a cooked recipe (Combo King)
@@ -144,6 +150,7 @@ export interface GameState {
   claimSpecial: (day: number) => void;
   logCook: (slots: (string | null)[]) => CookOutcome;
   nameRecipe: (fingerprint: string, name: string) => void;
+  claimSet: (id: string) => void;
   refreshBadges: () => void;
 
   // scene
@@ -204,6 +211,8 @@ export const useGameStore = create<GameState>()(
       highestTierSeen: "none",
       discoveredRecipes: {},
       discoveredAffinities: {},
+      rumorClaimed: false,
+      claimedSets: [],
       unlockedBadges: [],
       weeksCompleted: 0,
       maxSlotsUsed: 0,
@@ -493,6 +502,8 @@ export const useGameStore = create<GameState>()(
           highestTierSeen: "none",
           discoveredRecipes: {},
           discoveredAffinities,
+          rumorClaimed: false,
+          claimedSets: [],
           maxSlotsUsed: 0,
           cravingMatchDays: 0,
         });
@@ -519,6 +530,8 @@ export const useGameStore = create<GameState>()(
           highestTierSeen: "none",
           discoveredRecipes: {},
           discoveredAffinities: {},
+          rumorClaimed: false,
+          claimedSets: [],
           unlockedBadges: [],
           weeksCompleted: 0,
           maxSlotsUsed: 0,
@@ -705,24 +718,72 @@ export const useGameStore = create<GameState>()(
         const needsNaming = isNewDiscovery && isHighTier;
 
         const maxSlotsUsed = Math.max(s.maxSlotsUsed, ids.length);
+        const cookCount = (existing?.cookCount ?? 0) + 1;
 
-        if (isNewDiscovery) {
-          const entry: DiscoveredRecipe = {
-            fingerprint,
-            ingredientIds: ids,
-            tier: score.tier,
-            multiplier: score.multiplier,
-            discoveredDay: s.currentDay,
-          };
+        // Taste-to-reveal: enough cooks of one recipe reveal its pairs in the
+        // Journal mid-day (day-end reveal stays as the safety net; both skip
+        // already-known pairs). ">=" so pre-feature saves fire on next cook.
+        let tastedPairs = 0;
+        let discoveredAffinities = s.discoveredAffinities;
+        if (cookCount >= TASTE_COOKS_TO_REVEAL && ids.length >= 2) {
+          for (let i = 0; i < ids.length; i++) {
+            for (let j = i + 1; j < ids.length; j++) {
+              const key = affinityPairKey(ids[i], ids[j]);
+              if (discoveredAffinities[key] === undefined) {
+                if (discoveredAffinities === s.discoveredAffinities)
+                  discoveredAffinities = { ...s.discoveredAffinities };
+                discoveredAffinities[key] = matrix[ids[i]]?.[ids[j]] ?? 0;
+                tastedPairs++;
+              }
+            }
+          }
+        }
+
+        if (ids.length > 0) {
+          const entry: DiscoveredRecipe = isNewDiscovery
+            ? {
+                fingerprint,
+                ingredientIds: ids,
+                tier: score.tier,
+                multiplier: score.multiplier,
+                discoveredDay: s.currentDay,
+                cookCount,
+              }
+            : { ...existing!, cookCount };
           set({
             discoveredRecipes: { ...s.discoveredRecipes, [fingerprint]: entry },
             maxSlotsUsed,
+            discoveredAffinities,
           });
         } else if (maxSlotsUsed !== s.maxSlotsUsed) {
           set({ maxSlotsUsed });
         }
+
+        // Weekly Rumor: superset containment claims it (cooking MORE than the
+        // rumored combo still counts; early guesses before full reveal too).
+        let rumorReward: number | undefined;
+        if (!s.rumorClaimed && ids.length > 0) {
+          const rumor = getWeeklyRumor(s.seed);
+          if (rumor && rumor.every((id) => ids.includes(id))) {
+            // ponytail: 5% of week earnings, floor 2k — scales with the player
+            rumorReward = Math.max(2_000, Math.floor(get().weekCurry * 0.05));
+            set({ rumorClaimed: true });
+            get().addCurry(rumorReward);
+          }
+        }
+
         get().refreshBadges();
-        return { fingerprint, isNewDiscovery, needsNaming };
+        return { fingerprint, isNewDiscovery, needsNaming, tastedPairs, rumorReward };
+      },
+
+      claimSet: (id) => {
+        const s = get();
+        if (s.claimedSets.includes(id)) return;
+        const cs = COLLECTION_SET_MAP[id];
+        if (!cs || setProgress(cs, s.discoveredAffinities) < cs.target) return;
+        set({ claimedSets: [...s.claimedSets, id] });
+        // ponytail: 2% of week earnings, floor 1k — same self-scaling knob
+        get().addCurry(Math.max(1_000, Math.floor(s.weekCurry * 0.02)));
       },
 
       nameRecipe: (fingerprint, name) => {
@@ -864,6 +925,8 @@ export const useGameStore = create<GameState>()(
         highestTierSeen: s.highestTierSeen,
         discoveredRecipes: s.discoveredRecipes,
         discoveredAffinities: s.discoveredAffinities,
+        rumorClaimed: s.rumorClaimed,
+        claimedSets: s.claimedSets,
         unlockedBadges: s.unlockedBadges,
         weeksCompleted: s.weeksCompleted,
         maxSlotsUsed: s.maxSlotsUsed,

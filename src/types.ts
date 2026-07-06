@@ -131,6 +131,7 @@ export interface DiscoveredRecipe {
   multiplier: number;
   name?: string; // set by the Naming Ceremony
   discoveredDay: number;
+  cookCount?: number; // cooks this week (taste-to-reveal progress)
 }
 
 // --- Restaurant scene (Phase 3/4) ---

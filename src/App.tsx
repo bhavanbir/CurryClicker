@@ -17,6 +17,7 @@ import { FranchiseScreen } from "./screens/FranchiseScreen";
 import { WeekSummaryModal } from "./components/WeekSummaryModal";
 import { RewardsLayer } from "./components/RewardsLayer";
 import { ShopNotifier } from "./components/ShopNotifier";
+import { BadgeNotifier } from "./components/BadgeNotifier";
 import { ShopDrawer } from "./components/ShopDrawer";
 import { ChefSpecialPanel } from "./components/ChefSpecialPanel";
 import { Onboarding } from "./components/Onboarding";
@@ -80,7 +81,9 @@ export default function App() {
             }}
             transition={{ duration: reduced ? 0 : 0.15, ease: "easeOut" }}
           >
-            {visibleScreen === "gameplay" && <GameplayScreen onNavigate={setScreen} />}
+            {visibleScreen === "gameplay" && (
+              <GameplayScreen onNavigate={setScreen} onOpenShop={() => setShopOpen(true)} />
+            )}
             {visibleScreen === "kitchen" && <KitchenScreen onNavigate={setScreen} />}
             {visibleScreen === "leaderboard" && !IS_DEMO && <LeaderboardScreen />}
             {visibleScreen === "profile" && <ProfileScreen onNavigate={setScreen} />}
@@ -107,6 +110,7 @@ export default function App() {
         onClose={() => setShopOpen(false)}
       />
       {!shopOpen && <ShopNotifier onOpenShop={() => setShopOpen(true)} />}
+      <BadgeNotifier onOpenProfile={() => setScreen("profile")} />
       {!hasOnboarded && <Onboarding />}
     </div>
   );

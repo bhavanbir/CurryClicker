@@ -4,8 +4,10 @@
 
 import type { DailySpecial, DailySnapshot, Flavor, RecipeTier } from "../types";
 import { FLAVORS, BASE_INGREDIENT_IDS } from "./ingredients";
-import { IS_DEMO, DEMO_LOCKED_INGREDIENT_SET } from "../target";
+import { IS_DEMO, DEMO_LOCKED_INGREDIENT_SET, DEMO_MAX_SLOTS } from "../target";
 import { makeRng } from "../lib/rng";
+import { getAffinityData } from "./affinityEngine";
+import { MAX_SLOTS } from "../config";
 
 export function getCurrentWeekId(d: Date = new Date()): string {
   // ISO-8601 week number.
@@ -60,6 +62,27 @@ export function getDailySpecial(day: number, seed: number): DailySpecial {
 export function getDailyCraving(day: number, seed: number): Flavor {
   const rng = makeRng(`${seed}-craving-day${day}`);
   return FLAVORS[Math.floor(rng() * FLAVORS.length)];
+}
+
+// Weekly Rumor: one guaranteed all-positive combo, revealed one ingredient per
+// day — a week-long treasure hunt. Deterministic per seed; null in demo builds
+// when no guaranteed combo is fully cookable (locked ingredients / 4-slot cap).
+export function getWeeklyRumor(seed: number): string[] | null {
+  const { guaranteed } = getAffinityData(seed);
+  const maxLen = IS_DEMO ? DEMO_MAX_SLOTS : MAX_SLOTS;
+  const pool = guaranteed.filter(
+    (c) =>
+      c.length <= maxLen &&
+      (!IS_DEMO || c.every((id) => !DEMO_LOCKED_INGREDIENT_SET.has(id))),
+  );
+  if (pool.length === 0) return null; // ponytail: demo hides the rumor that week
+  const rng = makeRng(`${seed}-rumor`);
+  return pool[Math.floor(rng() * pool.length)];
+}
+
+// Combo order is already seeded-shuffled, so revealing a prefix is fair.
+export function rumorRevealedCount(rumor: string[], day: number): number {
+  return Math.min(day, rumor.length);
 }
 
 // Recipe Streak (framework §9): consecutive days ending at tier good+ build a

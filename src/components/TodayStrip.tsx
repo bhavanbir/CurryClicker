@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useGameStore } from "../store/useGameStore";
 import { useRecipeScore } from "../hooks/useRecipeScore";
-import { getDailyCraving } from "../engine/weekEngine";
+import { getDailyCraving, getWeeklyRumor, rumorRevealedCount } from "../engine/weekEngine";
 import { CRAVING_MATCH_BONUS } from "../engine/recipeEngine";
+import { INGREDIENTS } from "../engine/ingredients";
 import type { CrazyCurryEvent } from "../hooks/useCrazyCurry";
 import { FLAVOR_META } from "./FlavorTag";
 import { Icon } from "./arcade/Icon";
+import { PixelIcon } from "./PixelIcon";
 
 interface Props {
   event: CrazyCurryEvent | null;
@@ -19,11 +21,13 @@ interface Props {
 export function TodayStrip({ event, nextEventAt }: Props) {
   const currentDay = useGameStore((s) => s.currentDay);
   const seed = useGameStore((s) => s.seed);
+  const rumorClaimed = useGameStore((s) => s.rumorClaimed);
   const score = useRecipeScore();
 
   const craving = getDailyCraving(currentDay, seed);
   const cravingMeta = FLAVOR_META[craving];
   const matched = score.flavor !== null && score.flavor === craving;
+  const rumor = getWeeklyRumor(seed);
 
   return (
     <div className="arcade-box grid overflow-hidden sm:grid-cols-2">
@@ -58,6 +62,57 @@ export function TodayStrip({ event, nextEventAt }: Props) {
       </div>
 
       <CrazyCountdown event={event} nextEventAt={nextEventAt} />
+
+      {/* Weekly Rumor — one guaranteed-legendary combo, one ingredient revealed
+          per day. Cook everything on the card (plus extras is fine) to claim. */}
+      {rumor && (
+        <div
+          className={`flex min-h-[3rem] items-center border-t-4 border-ink px-3 py-2 sm:col-span-2 ${
+            rumorClaimed ? "bg-buy/20" : "bg-cream-100"
+          }`}
+        >
+          {rumorClaimed ? (
+            <Done label="Rumor cooked!" />
+          ) : (
+            <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-1">
+              <div className="flex items-center gap-1.5">
+                <Icon name="menu_book" fill size={14} className="text-flavor-unique" />
+                <span className="font-display text-[11px] font-black uppercase tracking-wide text-ink">
+                  Rumored Recipe
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {rumor.map((id, i) =>
+                  i < rumorRevealedCount(rumor, currentDay) ? (
+                    <span
+                      key={id}
+                      className="flex h-9 w-9 items-center justify-center rounded-md border-2 border-ink bg-white"
+                      title={INGREDIENTS[id].name}
+                    >
+                      <PixelIcon
+                        id={id}
+                        icon={INGREDIENTS[id].icon}
+                        size={32}
+                        iconClassName={INGREDIENTS[id].color}
+                      />
+                    </span>
+                  ) : (
+                    <span
+                      key={id}
+                      className="flex h-9 w-9 items-center justify-center rounded-md border-2 border-dashed border-ink/40 text-sm font-black text-ink/40"
+                    >
+                      ?
+                    </span>
+                  ),
+                )}
+              </div>
+              <span className="text-[11px] font-semibold text-ink/50">
+                A new ingredient leaks each day — cook them all for a payout
+              </span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

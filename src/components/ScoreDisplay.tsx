@@ -1,9 +1,10 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
+import { animate, motion, useReducedMotion } from "framer-motion";
 import { useGameStore } from "../store/useGameStore";
 import { formatScore } from "../lib/format";
 
 // Big stroked arcade score. Pulses on change by re-mounting via `key`.
+// Gains roll up slot-machine style; spends snap down instantly.
 // Tapping the "High" line opens a small popover explaining why the current
 // score and the high score drift apart.
 export function ScoreDisplay() {
@@ -11,7 +12,30 @@ export function ScoreDisplay() {
   const weekCurry = useGameStore((s) => s.weekCurry);
   const highScore = useGameStore((s) => s.highScore);
   const [open, setOpen] = useState(false);
-  const text = formatScore(currentCurry);
+  const reduced = useReducedMotion() ?? false;
+
+  const [display, setDisplay] = useState(currentCurry);
+  const displayRef = useRef(currentCurry);
+  useEffect(() => {
+    if (reduced || currentCurry < displayRef.current) {
+      displayRef.current = currentCurry;
+      setDisplay(currentCurry);
+      return;
+    }
+    // Retargets on every store change, so auto-production ticks just steer
+    // the tween instead of fighting it.
+    const c = animate(displayRef.current, currentCurry, {
+      duration: 0.35,
+      ease: "easeOut",
+      onUpdate: (v) => {
+        displayRef.current = v;
+        setDisplay(v);
+      },
+    });
+    return () => c.stop();
+  }, [currentCurry, reduced]);
+
+  const text = formatScore(Math.floor(display));
 
   return (
     <div className="relative flex flex-col items-center leading-none">
@@ -19,7 +43,7 @@ export function ScoreDisplay() {
         Score
       </span>
       <motion.span
-        key={text}
+        key={currentCurry}
         initial={{ scale: 1.18 }}
         animate={{ scale: 1 }}
         transition={{ type: "spring", stiffness: 320, damping: 16 }}

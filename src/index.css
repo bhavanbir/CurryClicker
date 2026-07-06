@@ -195,11 +195,57 @@ body {
 .float-rise {
   animation: float-rise 0.8s ease-out forwards;
 }
+/* Payoff juice — scene shake (big moments only) + On Fire glow + crit telegraph */
+@keyframes shake-sm {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(3px, -2px); }
+  50% { transform: translate(-3px, 2px); }
+  75% { transform: translate(2px, 3px); }
+}
+@keyframes shake-lg {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(7px, -5px); }
+  40% { transform: translate(-6px, 5px); }
+  60% { transform: translate(5px, 6px); }
+  80% { transform: translate(-7px, -4px); }
+}
+.shake-sm {
+  animation: shake-sm 0.3s ease-out;
+}
+.shake-lg {
+  animation: shake-lg 0.4s ease-out;
+}
+@keyframes on-fire-glow {
+  0%, 100% { box-shadow: 0 0 12px 2px rgba(255, 122, 0, 0.55); }
+  50% { box-shadow: 0 0 24px 6px rgba(255, 122, 0, 0.85); }
+}
+.on-fire-glow {
+  animation: on-fire-glow 0.8s ease-in-out infinite;
+  border-radius: 12px;
+}
+@keyframes crit-telegraph {
+  0%, 100% { transform: translate(-50%, -50%) scale(0.85) rotate(-4deg); opacity: 0.6; }
+  50% { transform: translate(-50%, -50%) scale(1.1) rotate(4deg); opacity: 1; }
+}
+.crit-telegraph {
+  animation: crit-telegraph 0.2s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .spice-particle,
   .spice-ring,
   .float-rise {
     animation: none;
     opacity: 0;
+  }
+  .shake-sm,
+  .shake-lg,
+  .on-fire-glow {
+    animation: none;
+  }
+  /* keep the telegraph visible as a static ring — it's a gameplay cue */
+  .crit-telegraph {
+    animation: none;
+    opacity: 0.8;
   }
 }

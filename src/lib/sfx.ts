@@ -77,10 +77,16 @@ function chord(notes: Tone[]): void {
   notes.forEach(tone);
 }
 
-/** A short cook blip — pitch wobbles a touch so rapid cooking doesn't drone. */
-export function playCook(): void {
+/** A short cook blip — pitch wobbles a touch so rapid cooking doesn't drone.
+ *  `intensity` 0..1 (On Fire heat) raises the pitch up to ~6 semitones. */
+export function playCook(intensity = 0): void {
   if (!enabled) return;
-  tone({ freq: 380 + Math.random() * 80, dur: 0.09, type: "square", gain: 0.045 });
+  tone({
+    freq: (380 + Math.random() * 80) * (1 + intensity * 0.5),
+    dur: 0.09,
+    type: "square",
+    gain: 0.045,
+  });
 }
 
 /** Two-note "ka-ching" on a successful purchase. */
