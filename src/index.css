@@ -36,8 +36,28 @@
   src: url("./assets/fonts/material-symbols-outlined.woff2") format("woff2");
 }
 
+/* Theme neutrals as RGB channels (see tailwind.config.js). Accents stay fixed. */
 :root {
   color-scheme: light;
+  --ink: 25 28 30; /* text/borders/shadows */
+  --ink-bg: 25 28 30; /* bg-ink scrims + chips — stays dark in both themes */
+  --surface: 255 255 255; /* bg-white panels */
+  --cream: 255 253 248;
+  --cream-50: 255 249 240;
+  --cream-100: 253 246 227;
+  --cream-200: 247 249 252;
+  --tertiary-fixed: 255 222 170;
+}
+.dark {
+  color-scheme: dark;
+  --ink: 240 234 222;
+  --ink-bg: 0 0 0;
+  --surface: 38 34 30;
+  --cream: 23 20 17;
+  --cream-50: 31 27 23;
+  --cream-100: 44 38 32;
+  --cream-200: 36 39 44;
+  --tertiary-fixed: 74 53 18;
 }
 
 html,
@@ -49,11 +69,11 @@ body,
 body {
   margin: 0;
   font-family: "Inter", system-ui, sans-serif;
-  color: #191c1e;
-  background-color: #fffdf8;
+  color: rgb(var(--ink));
+  background-color: rgb(var(--cream));
   background-image:
     radial-gradient(1100px 500px at 50% -8%, rgba(255, 140, 0, 0.1), transparent 60%),
-    linear-gradient(#fffdf8, #fdf6e3);
+    linear-gradient(rgb(var(--cream)), rgb(var(--cream-100)));
   background-attachment: fixed;
   -webkit-tap-highlight-color: transparent;
   -webkit-user-select: none;
@@ -90,7 +110,7 @@ body {
   /* Static bordered panel with hard offset shadow */
   .arcade-box {
     @apply border-4 border-ink bg-white rounded-xl;
-    box-shadow: 6px 6px 0 0 #191c1e;
+    box-shadow: 6px 6px 0 0 rgb(var(--ink));
   }
 
   /* Heavy wooden diorama frame for the restaurant scene — visually distinct
@@ -100,7 +120,7 @@ body {
     border: 6px solid #523014;
     box-shadow:
       inset 0 0 0 4px #a9702f,
-      6px 6px 0 0 #191c1e;
+      6px 6px 0 0 rgb(var(--ink));
   }
 
   /* Shop drawer surface + awning — market-stall stripes so the store reads
@@ -114,21 +134,25 @@ body {
     );
   }
   .shop-awning {
-    background: repeating-linear-gradient(90deg, #ff8c00 0 22px, #fffdf8 22px 44px);
+    background: repeating-linear-gradient(90deg, #ff8c00 0 22px, rgb(var(--cream)) 22px 44px);
+  }
+  /* Dark market stall: deep wood instead of peach, same stripe overlay */
+  .dark .shop-surface {
+    background-color: #3d2b12;
   }
 
   /* Interactive control: lifts on hover, presses down on active */
   .arcade-btn {
     @apply border-4 border-ink rounded-lg transition-all duration-100 font-display font-extrabold;
-    box-shadow: 4px 4px 0 0 #191c1e;
+    box-shadow: 4px 4px 0 0 rgb(var(--ink));
   }
   .arcade-btn:hover:not(:disabled) {
     transform: translate(-1px, -1px);
-    box-shadow: 5px 5px 0 0 #191c1e;
+    box-shadow: 5px 5px 0 0 rgb(var(--ink));
   }
   .arcade-btn:active:not(:disabled) {
     transform: translate(4px, 4px);
-    box-shadow: 0 0 0 0 #191c1e;
+    box-shadow: 0 0 0 0 rgb(var(--ink));
   }
   .arcade-btn:disabled {
     @apply opacity-50 cursor-not-allowed;
@@ -136,7 +160,7 @@ body {
 
   /* Heavy "stroked" arcade text for scores/headlines */
   .text-stroke-ink {
-    -webkit-text-stroke: 1.5px #191c1e;
+    -webkit-text-stroke: 1.5px rgb(var(--ink));
     paint-order: stroke fill;
   }
 }
@@ -147,7 +171,7 @@ body {
   height: 8px;
 }
 *::-webkit-scrollbar-thumb {
-  background: rgba(25, 28, 30, 0.18);
+  background: rgb(var(--ink) / 0.18);
   border-radius: 8px;
 }
 

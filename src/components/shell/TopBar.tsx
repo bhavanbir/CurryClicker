@@ -8,10 +8,9 @@ import logoUrl from "../../assets/logo_chili.png";
 interface Props {
   screen: Screen;
   onNavigate: (s: Screen) => void;
-  onOpenShop: () => void;
 }
 
-export function TopBar({ screen, onNavigate, onOpenShop }: Props) {
+export function TopBar({ screen, onNavigate }: Props) {
   const currentCurry = useGameStore((s) => s.currentCurry);
 
   return (
@@ -59,15 +58,6 @@ export function TopBar({ screen, onNavigate, onOpenShop }: Props) {
               </button>
             );
           })}
-          {/* Store opens the shop drawer, not a route */}
-          <button
-            type="button"
-            onClick={onOpenShop}
-            className="flex items-center gap-1.5 rounded-lg border-2 border-transparent px-3 py-1.5 text-sm font-bold uppercase tracking-wide text-ink/70 transition-all hover:text-ink"
-          >
-            <Icon name="storefront" size={20} />
-            Store
-          </button>
         </nav>
 
         {/* Right: curry balance + settings */}

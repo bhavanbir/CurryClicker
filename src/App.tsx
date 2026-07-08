@@ -11,15 +11,15 @@ import { KitchenScreen } from "./screens/KitchenScreen";
 import { LeaderboardScreen } from "./screens/LeaderboardScreen";
 import { ProfileScreen } from "./screens/ProfileScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
-import { LoginScreen } from "./screens/LoginScreen";
 import { AffinityJournalScreen } from "./screens/AffinityJournalScreen";
 import { FranchiseScreen } from "./screens/FranchiseScreen";
+import { ShopScreen } from "./screens/ShopScreen";
 import { WeekSummaryModal } from "./components/WeekSummaryModal";
+import { DayChoiceModal } from "./components/DayChoiceModal";
 import { RewardsLayer } from "./components/RewardsLayer";
 import { ShopNotifier } from "./components/ShopNotifier";
 import { BadgeNotifier } from "./components/BadgeNotifier";
 import { ShopDrawer } from "./components/ShopDrawer";
-import { ChefSpecialPanel } from "./components/ChefSpecialPanel";
 import { Onboarding } from "./components/Onboarding";
 import {
   setSfxEnabled,
@@ -43,6 +43,13 @@ export default function App() {
   const [shopOpen, setShopOpen] = useState(false);
   const reduced = useReducedMotion() ?? false;
 
+  // The full-page shop and the side drawer are the same catalogue — never
+  // show both at once.
+  const navigate = (s: Screen) => {
+    if (s === "shop") setShopOpen(false);
+    setScreen(s);
+  };
+
   // Keep the sound engine in sync with the settings.
   useEffect(() => setSfxEnabled(sfxOn), [sfxOn]);
   useEffect(() => setSfxVolume(sfxVolume), [sfxVolume]);
@@ -52,17 +59,11 @@ export default function App() {
   // The demo build has no online features — coerce any gated screen back to
   // gameplay so a stray navigation can never land on a hidden screen.
   const visibleScreen: Screen =
-    IS_DEMO && (screen === "leaderboard" || screen === "login")
-      ? "gameplay"
-      : screen;
+    IS_DEMO && screen === "leaderboard" ? "gameplay" : screen;
 
   return (
     <div className="min-h-[100dvh] w-full">
-      <TopBar
-        screen={visibleScreen}
-        onNavigate={setScreen}
-        onOpenShop={() => setShopOpen(true)}
-      />
+      <TopBar screen={visibleScreen} onNavigate={navigate} />
 
       <main
         className={`mx-auto w-full max-w-container px-3 pb-28 pt-[72px] transition-[padding] duration-300 sm:px-4 md:pb-8 ${
@@ -82,33 +83,29 @@ export default function App() {
             transition={{ duration: reduced ? 0 : 0.15, ease: "easeOut" }}
           >
             {visibleScreen === "gameplay" && (
-              <GameplayScreen onNavigate={setScreen} onOpenShop={() => setShopOpen(true)} />
+              <GameplayScreen onNavigate={navigate} onOpenShop={() => setShopOpen(true)} />
             )}
-            {visibleScreen === "kitchen" && <KitchenScreen onNavigate={setScreen} />}
+            {visibleScreen === "kitchen" && <KitchenScreen onNavigate={navigate} />}
             {visibleScreen === "leaderboard" && !IS_DEMO && <LeaderboardScreen />}
-            {visibleScreen === "profile" && <ProfileScreen onNavigate={setScreen} />}
-            {visibleScreen === "settings" && <SettingsScreen onNavigate={setScreen} />}
-            {visibleScreen === "login" && !IS_DEMO && <LoginScreen onNavigate={setScreen} />}
-            {visibleScreen === "journal" && <AffinityJournalScreen onNavigate={setScreen} />}
-            {visibleScreen === "franchise" && <FranchiseScreen onNavigate={setScreen} />}
+            {visibleScreen === "profile" && <ProfileScreen onNavigate={navigate} />}
+            {visibleScreen === "settings" && <SettingsScreen onNavigate={navigate} />}
+            {visibleScreen === "journal" && <AffinityJournalScreen onNavigate={navigate} />}
+            {visibleScreen === "franchise" && <FranchiseScreen onNavigate={navigate} />}
+            {visibleScreen === "shop" && <ShopScreen onNavigate={navigate} />}
           </motion.div>
         </AnimatePresence>
       </main>
 
-      <BottomNav
-        screen={visibleScreen}
-        onNavigate={setScreen}
-        onOpenShop={() => setShopOpen(true)}
-      />
+      <BottomNav screen={visibleScreen} onNavigate={navigate} />
 
-      {phase === "week_summary" && <WeekSummaryModal onNavigate={setScreen} />}
+      {phase === "week_summary" && <WeekSummaryModal onNavigate={navigate} />}
+      <DayChoiceModal />
       <RewardsLayer />
-      <ChefSpecialPanel />
       <ShopDrawer
         open={shopOpen}
         onOpen={() => setShopOpen(true)}
         onClose={() => setShopOpen(false)}
-        onNavigate={setScreen}
+        onNavigate={navigate}
       />
       {!shopOpen && <ShopNotifier onOpenShop={() => setShopOpen(true)} />}
       <BadgeNotifier onOpenProfile={() => setScreen("profile")} />

@@ -4,9 +4,9 @@ export type Screen =
   | "leaderboard"
   | "profile"
   | "settings"
-  | "login"
   | "journal"
-  | "franchise";
+  | "franchise"
+  | "shop";
 
 export interface NavItem {
   screen: Screen;
@@ -21,6 +21,7 @@ const ALL_NAV: NavItem[] = [
   { screen: "kitchen", label: "Kitchen", icon: "skillet" },
   { screen: "leaderboard", label: "Ranks", icon: "leaderboard" },
   { screen: "profile", label: "Chef", icon: "account_circle" },
+  { screen: "shop", label: "Shop", icon: "storefront" },
 ];
 
 // Primary nav (top bar on desktop, bottom bar on mobile). The Leaderboard is an

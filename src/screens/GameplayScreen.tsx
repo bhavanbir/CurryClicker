@@ -7,6 +7,7 @@ import { recipeFingerprint } from "../engine/cookbook";
 import { TASTE_COOKS_TO_REVEAL } from "../config";
 import { handleClick, type ClickMods } from "../engine/clickEngine";
 import { getDailySpecial, getDailyCraving } from "../engine/weekEngine";
+import { DAY_CHOICE_MAP } from "../engine/dayChoices";
 import { INGREDIENTS } from "../engine/ingredients";
 import { formatCurry } from "../lib/format";
 import { playCook, playDiscovery } from "../lib/sfx";
@@ -19,6 +20,7 @@ import { FloatText, type Float } from "../components/FloatText";
 import { ClickBurst } from "../components/ClickBurst";
 import { PixelIcon } from "../components/PixelIcon";
 import { TodayStrip } from "../components/TodayStrip";
+import { ChefSpecialPanel } from "../components/ChefSpecialPanel";
 import { FlavorTag } from "../components/FlavorTag";
 import { RecipeNamingModal } from "../components/RecipeNamingModal";
 import { StatChip } from "../components/arcade/StatChip";
@@ -51,13 +53,20 @@ const CRIT_TIERS = [
 ] as const;
 type CritTier = (typeof CRIT_TIERS)[number];
 
-function rollCritTier(): CritTier {
-  let r = Math.random() * 100;
-  for (const t of CRIT_TIERS) {
-    r -= t.weight;
-    if (r < 0) return t;
-  }
-  return CRIT_TIERS[0];
+function rollCritTier(biasLow = false): CritTier {
+  const roll = () => {
+    let r = Math.random() * 100;
+    for (const t of CRIT_TIERS) {
+      r -= t.weight;
+      if (r < 0) return t;
+    }
+    return CRIT_TIERS[0];
+  };
+  const first = roll();
+  if (!biasLow) return first;
+  // Bubble Bonanza's cost: roll twice, keep the lower multiplier.
+  const second = roll();
+  return first.mult <= second.mult ? first : second;
 }
 
 const CHAIN_CAP = 3; // max jackpot-chain depth after the first crit click
@@ -84,6 +93,8 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
   const discoveredRecipes = useGameStore((s) => s.discoveredRecipes);
   const discoveredAffinities = useGameStore((s) => s.discoveredAffinities);
   const franchiseStarsEarned = useGameStore((s) => s.franchiseStarsEarned);
+  const activeDayModifierId = useGameStore((s) => s.activeDayModifierId);
+  const dayMod = activeDayModifierId ? DAY_CHOICE_MAP[activeDayModifierId] : undefined;
 
   const demoEnded = IS_DEMO && weeksCompleted >= 1;
 
@@ -118,7 +129,10 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
     craving,
   };
 
-  const perCook = handleClick(slots, getAffinityData(seed).matrix, effects, mods).value;
+  const perCook = Math.floor(
+    handleClick(slots, getAffinityData(seed).matrix, effects, mods).value *
+      (dayMod?.clickMult ?? 1),
+  );
 
   // Taste-to-reveal progress for the standing recipe (any pair still unknown?)
   const hasUntastedPair =
@@ -142,7 +156,10 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
 
     const crazyMult = crazy.registerCook();
     const fireMult = onFire.registerCook();
-    const value = Math.floor(result.value * crazyMult * critMult * fireMult);
+    const value = Math.floor(
+      result.value * crazyMult * critMult * fireMult * (dayMod?.clickMult ?? 1),
+    );
+    if (value <= 0) return;
 
     addCurry(value);
     registerClick();
@@ -178,8 +195,9 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
     // 25% chance to spawn a critical circle (if none is up) — click it before
     // it expires for the tier's multiplier. Crit clicks skip this roll; their
     // follow-up comes from the jackpot chain in clickCrit instead.
-    if (critMult === 1 && !crit && Math.random() < 0.25) {
-      spawnCrit(rollCritTier(), 0);
+    const critChance = Math.min(0.25 * (dayMod?.critChanceMult ?? 1), 0.9);
+    if (critMult === 1 && !crit && Math.random() < critChance) {
+      spawnCrit(rollCritTier(dayMod?.critBiasLow), 0);
     }
 
     const id = floatId++;
@@ -356,6 +374,7 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
 
       {/* Restaurant scene + floats */}
       <div ref={sceneWrapRef} className="relative">
+        <ChefSpecialPanel />
         <RestaurantScene
           cookSignal={cookSignal}
           onCook={cook}
@@ -470,35 +489,6 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
           </div>
         )}
 
-        {/* Crazy Curry banner — keep clicking above the floor for the bonus */}
-        {crazy.event && (
-          <motion.div
-            key={crazy.event.startedAt}
-            initial={{ y: -16, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            className="pointer-events-none absolute left-1/2 top-10 z-40 w-max max-w-[90%] -translate-x-1/2 rounded-xl border-4 border-ink bg-curry-yellow px-4 py-2 text-center shadow-arcade"
-          >
-            <div className="flex items-center justify-center gap-1 font-display text-sm font-black uppercase tracking-wide text-ink">
-              <Icon name="local_fire_department" fill size={18} className="text-tier-terrible" />
-              Crazy Curry! Keep {crazy.event.floor}+ clicks/sec
-            </div>
-            <div
-              className={`text-xs font-black uppercase tracking-wide ${
-                crazy.onPace ? "text-tier-good" : "text-ink/60"
-              }`}
-            >
-              {crazy.onPace
-                ? `×${crazy.event.mult} bonus active!`
-                : `×${crazy.event.mult} if you keep the pace`}
-            </div>
-            <motion.div
-              className="mt-1 h-1.5 rounded-full bg-ink/80"
-              initial={{ width: "100%" }}
-              animate={{ width: "0%" }}
-              transition={{ duration: crazy.event.durationMs / 1000, ease: "linear" }}
-            />
-          </motion.div>
-        )}
       </div>
 
       {/* Active recipe bar */}
@@ -584,6 +574,17 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
           <div className="flex items-center gap-2 text-sm font-semibold text-ink/70">
             <Icon name="info" className="text-primary" size={20} />
             No recipe yet — open the Kitchen to cook one up!
+          </div>
+        )}
+
+        {/* Active end-of-day deal, so the trade-off stays visible all day. */}
+        {dayMod && (
+          <div className="flex items-center gap-2 rounded-lg border-2 border-ink bg-tertiary-fixed px-3 py-2 text-sm font-bold text-ink/80 shadow-arcade-sm">
+            <Icon name={dayMod.icon} fill size={18} className="text-primary" />
+            <span className="uppercase">{dayMod.name}</span>
+            <span className="font-semibold text-ink/60">
+              {dayMod.bonus} · {dayMod.cost}
+            </span>
           </div>
         )}
 

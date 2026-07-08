@@ -19,6 +19,8 @@ export function SettingsScreen({ onNavigate }: Props) {
   const sfxVolume = useGameStore((s) => s.sfxVolume);
   const musicVolume = useGameStore((s) => s.musicVolume);
   const setAudio = useGameStore((s) => s.setAudio);
+  const darkMode = useGameStore((s) => s.darkMode);
+  const toggleDark = useGameStore((s) => s.toggleDark);
   const replayOnboarding = useGameStore((s) => s.replayOnboarding);
   const hardReset = useGameStore((s) => s.hardReset);
   const [confirmReset, setConfirmReset] = useState(false);
@@ -65,26 +67,13 @@ export function SettingsScreen({ onNavigate }: Props) {
     <div className="mx-auto flex w-full max-w-xl flex-col gap-5">
       <PageHeader title="Settings" />
 
-      {IS_DEMO ? (
+      {IS_DEMO && (
         <Group title="Demo">
           <p className="text-sm font-semibold text-ink/70">
             You're playing the free offline demo — progress saves to this browser.
-            Accounts, cloud saves, and leaderboards live in the full game.
+            Steam achievements and rankings live in the full game.
           </p>
           <SteamCta label="Get the full game on Steam" />
-        </Group>
-      ) : (
-        <Group title="Account">
-          <Row icon="account_circle" label="Signed in as" value="Guest" />
-          <ArcadeButton
-            variant="primary"
-            size="lg"
-            className="w-full"
-            onClick={() => onNavigate("login")}
-          >
-            <Icon name="login" size={20} />
-            Sign In / Create Account
-          </ArcadeButton>
         </Group>
       )}
 
@@ -115,7 +104,12 @@ export function SettingsScreen({ onNavigate }: Props) {
 
       <Group title="Game">
         <Row icon="schedule" label="Week length" value={`${weekMinutes} min`} />
-        <Row icon="palette" label="Theme" value="Spicetone Arcade" />
+        <ToggleRow
+          icon="dark_mode"
+          label="Dark mode"
+          on={darkMode}
+          onToggle={toggleDark}
+        />
         <ArcadeButton
           size="lg"
           className="w-full"

@@ -1,17 +1,20 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
+  darkMode: "class",
   theme: {
     extend: {
       colors: {
-        // Spicetone Arcade — light/warm palette from the Stitch mockups
+        // Spicetone Arcade — light/warm palette from the Stitch mockups.
+        // Neutrals are CSS variables (RGB channels) so `.dark` on <html> can
+        // swap the whole theme; accents (primary/buy/tier/…) stay fixed.
         cream: {
-          DEFAULT: "#fffdf8",
-          50: "#fff9f0",
-          100: "#fdf6e3",
-          200: "#f7f9fc",
+          DEFAULT: "rgb(var(--cream) / <alpha-value>)",
+          50: "rgb(var(--cream-50) / <alpha-value>)",
+          100: "rgb(var(--cream-100) / <alpha-value>)",
+          200: "rgb(var(--cream-200) / <alpha-value>)",
         },
-        ink: "#191c1e", // near-black for borders + text
+        ink: "rgb(var(--ink) / <alpha-value>)", // near-black for borders + text (light in dark mode)
         primary: {
           DEFAULT: "#ff8c00",
           dark: "#e66e00",
@@ -24,7 +27,7 @@ export default {
         },
         tertiary: {
           DEFAULT: "#fabc44",
-          fixed: "#ffdeaa",
+          fixed: "rgb(var(--tertiary-fixed) / <alpha-value>)",
           container: "#da9f28",
         },
         buy: "#4ade80", // green "$ buy" buttons
@@ -48,6 +51,13 @@ export default {
           rare: "#d946ef",
         },
       },
+      // Backgrounds resolve separately from text/borders: bg-white is the panel
+      // surface (dark in dark mode) while text-white button labels stay white;
+      // bg-ink scrims/chips stay dark while text-ink/border-ink flip light.
+      backgroundColor: {
+        white: "rgb(var(--surface) / <alpha-value>)",
+        ink: "rgb(var(--ink-bg) / <alpha-value>)",
+      },
       fontFamily: {
         display: ["Montserrat", "system-ui", "sans-serif"],
         body: ["Inter", "system-ui", "sans-serif"],
@@ -65,10 +75,10 @@ export default {
         container: "1200px",
       },
       boxShadow: {
-        "arcade-sm": "2px 2px 0 0 #191c1e",
-        arcade: "4px 4px 0 0 #191c1e",
-        "arcade-lg": "6px 6px 0 0 #191c1e",
-        "arcade-xl": "8px 8px 0 0 #191c1e",
+        "arcade-sm": "2px 2px 0 0 rgb(var(--ink))",
+        arcade: "4px 4px 0 0 rgb(var(--ink))",
+        "arcade-lg": "6px 6px 0 0 rgb(var(--ink))",
+        "arcade-xl": "8px 8px 0 0 rgb(var(--ink))",
       },
       keyframes: {
         "steam-rise": {

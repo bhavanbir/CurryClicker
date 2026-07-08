@@ -84,7 +84,7 @@ export function CookbookModal({ onClose }: { onClose: () => void }) {
               </span>
               <div className="mt-2 space-y-2">
                 {g.items.map((r) => (
-                  <RecipeRow key={r.fingerprint} recipe={r} />
+                  <RecipeRow key={r.fingerprint} recipe={r} onMixIn={onClose} />
                 ))}
               </div>
             </div>
@@ -95,18 +95,49 @@ export function CookbookModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-function RecipeRow({ recipe }: { recipe: DiscoveredRecipe }) {
+function RecipeRow({
+  recipe,
+  onMixIn,
+}: {
+  recipe: DiscoveredRecipe;
+  onMixIn: () => void;
+}) {
+  const clearRecipe = useGameStore((s) => s.clearRecipe);
+  const toggleIngredient = useGameStore((s) => s.toggleIngredient);
+  const unlockedSlots = useGameStore((s) => s.unlockedSlots);
+  // toggleIngredient silently drops ingredients beyond unlockedSlots, which
+  // would mix a *different* recipe — disable instead.
+  const tooBig = recipe.ingredientIds.length > unlockedSlots;
+
+  // Same swap as ChefSpecialPanel.mixIn: clear first so every toggle lands in
+  // a free slot, then close so the player sees the Kitchen recipe update.
+  function mixIn() {
+    clearRecipe();
+    recipe.ingredientIds.forEach(toggleIngredient);
+    onMixIn();
+  }
+
   return (
     <div className="rounded-md border-2 border-ink bg-white p-2">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <span
-          className={`font-display text-sm font-extrabold ${recipe.name ? "text-primary" : "text-ink/50"}`}
+          className={`min-w-0 truncate font-display text-sm font-extrabold ${recipe.name ? "text-primary" : "text-ink/50"}`}
         >
           {recipe.name ?? "Unnamed"}
         </span>
-        <span className="font-display text-sm font-black tabular-nums text-ink">
+        <span className="ml-auto font-display text-sm font-black tabular-nums text-ink">
           {recipe.multiplier.toFixed(2)}×
         </span>
+        <motion.button
+          type="button"
+          onClick={mixIn}
+          disabled={tooBig}
+          title={tooBig ? "Unlock more recipe slots first" : undefined}
+          whileTap={tooBig ? undefined : { scale: 0.95 }}
+          className="arcade-btn shrink-0 bg-primary px-2 py-1 text-[10px] uppercase text-white"
+        >
+          Mix it in
+        </motion.button>
       </div>
       <div className="mt-1 flex flex-wrap items-center gap-1">
         {recipe.ingredientIds.map((id) => {

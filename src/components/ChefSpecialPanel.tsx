@@ -6,11 +6,10 @@ import { INGREDIENTS } from "../engine/ingredients";
 import { Icon } from "./arcade/Icon";
 import { PixelIcon } from "./PixelIcon";
 
-// Chef's Special as a vertical card hugging the left edge (the right edge
-// belongs to the Shop handle/drawer) — big ingredient sprites instead of the
-// old text pills. Always visible on xl+ screens; between md and xl it folds
-// into a left edge tab (mirroring the shop handle) so it never covers the
-// scene. On mobile the special is discoverable from the Kitchen.
+// Chef's Special as a vertical card attached to the left side of the kitchen
+// frame (mounted inside GameplayScreen's scene wrapper). Starts open and folds
+// into a left edge tab (mirroring the shop handle) at any md+ size. On mobile
+// the special is discoverable from the Kitchen.
 export function ChefSpecialPanel() {
   const currentDay = useGameStore((s) => s.currentDay);
   const seed = useGameStore((s) => s.seed);
@@ -18,7 +17,7 @@ export function ChefSpecialPanel() {
   const claimDays = useGameStore((s) => s.specialClaimDays);
   const clearRecipe = useGameStore((s) => s.clearRecipe);
   const toggleIngredient = useGameStore((s) => s.toggleIngredient);
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
 
   const special = getDailySpecial(currentDay, seed);
   const a = INGREDIENTS[special.ingredientA];
@@ -39,12 +38,12 @@ export function ChefSpecialPanel() {
 
   const card = (
     <div className="arcade-box relative flex flex-col items-center gap-2 p-3 shadow-arcade">
-      {/* Close (collapse back to the edge tab) — only shown below xl */}
+      {/* Close (collapse back to the edge tab) */}
       <button
         type="button"
         onClick={() => setExpanded(false)}
         aria-label="Collapse chef's special"
-        className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-md border-2 border-ink bg-white text-ink shadow-arcade-sm xl:hidden"
+        className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-md border-2 border-ink bg-white text-ink shadow-arcade-sm"
       >
         <Icon name="close" size={14} />
       </button>
@@ -86,32 +85,22 @@ export function ChefSpecialPanel() {
     </div>
   );
 
-  return (
-    <>
-      {/* Wide screens: always-visible floating panel */}
-      <aside className="fixed left-3 top-24 z-30 hidden w-[124px] flex-col xl:flex">
-        {card}
-      </aside>
-
-      {/* md–xl: edge tab that expands the same card in place */}
-      {expanded ? (
-        <aside className="fixed left-3 top-24 z-30 hidden w-[124px] flex-col md:flex xl:hidden">
-          {card}
-        </aside>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setExpanded(true)}
-          aria-label="Show chef's special"
-          className="fixed left-0 top-24 z-30 hidden flex-col items-center gap-1.5 rounded-r-lg border-4 border-l-0 border-ink bg-primary px-1.5 py-4 text-white shadow-arcade transition-transform hover:translate-x-0.5 md:flex xl:hidden"
-        >
-          <Icon name="star" fill size={22} />
-          <span className="text-xs font-black uppercase tracking-widest [writing-mode:vertical-rl]">
-            Special
-          </span>
-        </button>
-      )}
-    </>
+  return expanded ? (
+    <aside className="absolute right-full top-0 z-30 -mr-3 hidden w-[124px] flex-col md:flex">
+      {card}
+    </aside>
+  ) : (
+    <button
+      type="button"
+      onClick={() => setExpanded(true)}
+      aria-label="Show chef's special"
+      className="fixed left-0 top-24 z-30 hidden flex-col items-center gap-1.5 rounded-r-lg border-4 border-l-0 border-ink bg-primary px-1.5 py-4 text-white shadow-arcade transition-transform hover:translate-x-0.5 md:flex"
+    >
+      <Icon name="star" fill size={22} />
+      <span className="text-xs font-black uppercase tracking-widest [writing-mode:vertical-rl]">
+        Special
+      </span>
+    </button>
   );
 }
 

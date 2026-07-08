@@ -1,6 +1,6 @@
-// Weekly identity + seed. In the full game the seed comes from Supabase's
-// weekly_seeds table; for the MVP we derive it locally from the ISO week so
-// the affinity matrix is still shared by anyone playing the same calendar week.
+// Calendar identity + seed, derived locally so the affinity matrix is shared
+// by anyone playing the same calendar day — no backend. The week id remains
+// for the in-game week loop's display/rollover.
 
 import type { DailySpecial, DailySnapshot, Flavor, RecipeTier } from "../types";
 import { FLAVORS, BASE_INGREDIENT_IDS } from "./ingredients";
@@ -26,7 +26,15 @@ export function getCurrentWeekId(d: Date = new Date()): string {
   return `${date.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
 }
 
-// Stable 32-bit hash (FNV-1a) of the week id -> integer seed.
+// Local calendar date, e.g. "2026-07-07". The affinity matrix, daily rivals,
+// and daily leaderboard all reseed when this rolls over at local midnight.
+export function getCurrentDateId(d: Date = new Date()): string {
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
+// Stable 32-bit hash (FNV-1a) of any id string -> integer seed.
 export function seedFromWeekId(weekId: string): number {
   let h = 2166136261;
   for (let i = 0; i < weekId.length; i++) {

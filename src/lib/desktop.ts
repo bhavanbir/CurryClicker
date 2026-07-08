@@ -6,6 +6,7 @@ export interface DesktopBridge {
   writeSave(data: string): Promise<void>;
   unlockAchievement(id: string): Promise<boolean>;
   submitWeekScore(value: number): Promise<boolean>;
+  getSteamPlayerName(): Promise<string | null>;
 }
 
 declare global {
@@ -40,4 +41,9 @@ export function unlockAchievement(badgeId: string): void {
 
 export function submitWeekScore(value: number): void {
   void desktop()?.submitWeekScore(value);
+}
+
+// Steam persona name, or null on web / when Steam isn't running.
+export async function getSteamPlayerName(): Promise<string | null> {
+  return (await desktop()?.getSteamPlayerName()) ?? null;
 }

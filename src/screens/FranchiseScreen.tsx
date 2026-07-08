@@ -62,7 +62,7 @@ export function FranchiseScreen({ onNavigate }: Props) {
             {franchiseRankFor(franchiseStarsEarned)}
           </div>
           <div className="mt-1 text-xs font-bold text-ink/55">
-            {franchiseStarsEarned.toLocaleString()} stars earned lifetime
+            {franchiseStarsEarned.toLocaleString()} stars earned today
           </div>
         </div>
         <div className="flex items-center gap-3 rounded-xl border-4 border-ink bg-white px-4 py-2 shadow-arcade-sm">

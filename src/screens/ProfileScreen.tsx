@@ -1,6 +1,7 @@
 import { useGameStore } from "../store/useGameStore";
 import { formatCurry } from "../lib/format";
 import { BADGES } from "../engine/badges";
+import { TROPHY_TIERS } from "../engine/dailyRivals";
 import { franchiseRankFor } from "../engine/franchiseData";
 import type { Screen } from "../navigation";
 import { Icon } from "../components/arcade/Icon";
@@ -14,8 +15,8 @@ interface Props {
   onNavigate: (s: Screen) => void;
 }
 
-// Stats + badges read from real game state. Account/auth wiring lands with the
-// Supabase work-units (Epic D).
+// Stats + badges read from real game state. Identity comes from the local
+// Steam account — no separate login.
 export function ProfileScreen({ onNavigate }: Props) {
   const totalCurry = useGameStore((s) => s.totalCurryAllTime);
   const highScore = useGameStore((s) => s.highScore);
@@ -24,6 +25,8 @@ export function ProfileScreen({ onNavigate }: Props) {
   const unlockedBadges = useGameStore((s) => s.unlockedBadges);
   const recipesFound = useGameStore((s) => Object.keys(s.discoveredRecipes).length);
   const franchiseStarsEarned = useGameStore((s) => s.franchiseStarsEarned);
+  const bestFranchiseStars = useGameStore((s) => s.bestFranchiseStars);
+  const trophies = useGameStore((s) => s.trophies);
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
@@ -35,16 +38,8 @@ export function ProfileScreen({ onNavigate }: Props) {
         <PageHeader title="Guest Chef" subtitle={franchiseRankFor(franchiseStarsEarned)} />
       </div>
 
-      {/* Account CTA. In the offline demo there are no accounts — point players
-          to the full game on Steam instead. */}
-      {IS_DEMO ? (
-        <SteamCta label="Get the full game on Steam" />
-      ) : (
-        <ArcadeButton variant="primary" size="lg" onClick={() => onNavigate("login")}>
-          <Icon name="login" size={22} />
-          Sign in to save &amp; compete
-        </ArcadeButton>
-      )}
+      {/* In the offline demo, point players to the full game on Steam. */}
+      {IS_DEMO && <SteamCta label="Get the full game on Steam" />}
 
       {/* Stats */}
       <section className="grid grid-cols-2 gap-3">
@@ -63,7 +58,14 @@ export function ProfileScreen({ onNavigate }: Props) {
         <Stat
           icon="stars"
           value={franchiseStarsEarned.toLocaleString()}
-          label="Lifetime Stars"
+          label="Stars Today"
+          iconBox="bg-violet-100"
+          iconColor="text-violet-600"
+        />
+        <Stat
+          icon="trophy"
+          value={bestFranchiseStars.toLocaleString()}
+          label="Best Stars in a Day"
           iconBox="bg-violet-100"
           iconColor="text-violet-600"
         />
@@ -76,6 +78,47 @@ export function ProfileScreen({ onNavigate }: Props) {
           Franchise HQ
           <Icon name="arrow_forward" size={20} />
         </ArcadeButton>
+      </section>
+
+      {/* Daily leaderboard trophies — repeatable counts, one per finish. */}
+      <section>
+        <h2 className="mb-2 font-display text-xl font-black uppercase text-ink">
+          Daily Trophies
+        </h2>
+        <div className="flex gap-3 overflow-x-auto pb-2 hide-scrollbar">
+          {TROPHY_TIERS.map((t) => {
+            const count = trophies[t.key] ?? 0;
+            const earned = count > 0;
+            return (
+              <div
+                key={t.key}
+                title={`${t.label} daily finishes`}
+                className={`flex w-20 shrink-0 flex-col items-center gap-1 rounded-xl border-4 p-2 ${
+                  earned
+                    ? "border-ink bg-white shadow-arcade-sm"
+                    : "border-dashed border-ink/40 bg-cream-50 opacity-70"
+                }`}
+              >
+                <div
+                  className={`flex h-12 w-12 items-center justify-center rounded-full border-2 border-ink ${
+                    earned ? "bg-gradient-to-br from-curry-yellow to-primary" : "bg-cream-100"
+                  }`}
+                >
+                  <Icon
+                    name={t.icon}
+                    fill={earned}
+                    size={22}
+                    className={earned ? "text-white" : "text-ink/50"}
+                  />
+                </div>
+                <span className="text-center text-[10px] font-bold leading-tight text-ink">
+                  {t.label}
+                  {earned && <> ×{count}</>}
+                </span>
+              </div>
+            );
+          })}
+        </div>
       </section>
 
       {/* Badges */}

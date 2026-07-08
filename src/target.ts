@@ -5,7 +5,7 @@
 //
 //   VITE_TARGET=full   (default) — the complete game (online + Steam features)
 //   VITE_TARGET=demo            — offline "try the mechanics" web demo:
-//                                  online-only screens (Leaderboard, Login) and
+//                                  the Leaderboard screen and
 //                                  the Cosmetics/IAP store section are hidden,
 //                                  and a "get it on Steam" CTA is shown instead.
 //

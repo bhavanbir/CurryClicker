@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useGameStore } from "../store/useGameStore";
 import { DAY_DURATION_SECONDS } from "../config";
+import { DAY_CHOICE_MAP } from "../engine/dayChoices";
 
 // Single requestAnimationFrame loop. React components subscribe to store values;
 // they do NOT drive timing. State is read via getState() inside the loop to
@@ -20,10 +21,17 @@ export function useGameLoop() {
       // Time only flows once the player has opened the day (Start Day) and
       // isn't paused. Auto-production also stops, so nothing ticks.
       if (s.phase === "cooking" && s.dayStarted && !s.dayPaused) {
-        if (s.autoProduction > 0) {
-          s.addCurry(s.autoProduction * deltaSec);
+        // End-of-day modifier can scale auto-production and the day's length.
+        const mod = s.activeDayModifierId
+          ? DAY_CHOICE_MAP[s.activeDayModifierId]
+          : undefined;
+        const auto = s.autoProduction * (mod?.autoMult ?? 1);
+        if (auto > 0) {
+          s.addCurry(auto * deltaSec);
         }
-        s.advanceDayProgress(deltaSec / DAY_DURATION_SECONDS);
+        const daySeconds =
+          mod?.daySeconds ?? DAY_DURATION_SECONDS * (mod?.dayLengthMult ?? 1);
+        s.advanceDayProgress(deltaSec / daySeconds);
       }
 
       raf = requestAnimationFrame(tick);

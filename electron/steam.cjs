@@ -28,6 +28,16 @@ function isAvailable() {
   return client !== null;
 }
 
+function getPlayerName() {
+  if (!client) return null;
+  try {
+    return client.localplayer.getName();
+  } catch (err) {
+    console.warn("[steam] getPlayerName failed:", err.message);
+    return null;
+  }
+}
+
 function unlockAchievement(id) {
   if (!client) return false;
   try {
@@ -41,10 +51,12 @@ function unlockAchievement(id) {
 function submitWeekScore(value) {
   if (!client) return false;
   try {
-    // steamworks.js (this version) exposes achievements + stats but NOT the
-    // ISteamUserStats leaderboard upload API. We record the week's total as an
-    // int stat as a stand-in so the renderer->bridge->main plumbing is proven;
-    // swap for a real leaderboard upload when the binding supports it.
+    // steamworks.js exposes achievements + stats but NOT the ISteamUserStats
+    // leaderboard API (verified against latest upstream, 2026-07). We record
+    // the week's total as an int stat as a stand-in. Real Steam leaderboards
+    // are possible once the real App ID exists, but require forking
+    // steamworks.js to expose leaderboards (its underlying Rust crate,
+    // steamworks-rs, already supports them) or switching bindings.
     const clamped = Math.max(0, Math.min(Math.floor(Number(value) || 0), 2147483647));
     client.stats.setInt(LEADERBOARD_NAME, clamped);
     return client.stats.store();
@@ -54,4 +66,4 @@ function submitWeekScore(value) {
   }
 }
 
-module.exports = { init, isAvailable, unlockAchievement, submitWeekScore };
+module.exports = { init, isAvailable, getPlayerName, unlockAchievement, submitWeekScore };

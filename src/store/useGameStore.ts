@@ -12,11 +12,14 @@ import type {
 } from "../types";
 import {
   getCurrentWeekId,
+  getCurrentDateId,
   seedFromWeekId,
   evaluateStreak,
   getDailyCraving,
   getWeeklyRumor,
 } from "../engine/weekEngine";
+import { getDailyRivals, placementFor, trophyTierFor } from "../engine/dailyRivals";
+import { pickDayChoiceIds } from "../engine/dayChoices";
 import { COLLECTION_SET_MAP, setProgress } from "../engine/collections";
 import { getAffinityData, affinityPairKey } from "../engine/affinityEngine";
 import {
@@ -41,7 +44,7 @@ import { BASE_UNLOCKED_SLOTS, TASTE_COOKS_TO_REVEAL } from "../config";
 import { IS_DEMO, DEMO_DECORATIONS } from "../target";
 
 export const SAVE_KEY = "curry-clicker-save";
-export const SAVE_VERSION = 10;
+export const SAVE_VERSION = 12;
 
 // NOTE: MVP keeps a flat store. The framework's slice split
 // (player/recipe/week/shop/cosmetics) is the Phase-2 refactor target.
@@ -62,15 +65,21 @@ export interface GameState {
   // --- player ---
   currentCurry: number;
   totalCurryAllTime: number;
-  weekCurry: number; // this week's leaderboard score
+  weekCurry: number; // this in-game week's running total
   highScore: number; // best weekCurry ever reached
   clicksThisWeek: number;
+
+  // --- daily leaderboard (calendar-day scoped) ---
+  dateId: string; // local calendar date the seed + daily score belong to
+  dailyCurry: number; // curry earned this calendar date — the leaderboard score
+  trophies: Record<string, number>; // placement tier (see trophyTierFor) -> count
 
   // --- settings ---
   sfxOn: boolean;
   musicOn: boolean;
   sfxVolume: number; // 0–1
   musicVolume: number; // 0–1
+  darkMode: boolean;
   hasOnboarded: boolean; // first-run tutorial dismissed
 
   // --- recipe ---
@@ -96,9 +105,10 @@ export interface GameState {
   weeksCompleted: number;
   maxSlotsUsed: number; // most slots in a cooked recipe (Combo King)
 
-  // --- franchise (prestige) ---
+  // --- franchise (prestige; resets every real calendar day) ---
   franchiseStars: number; // spendable Star balance
-  franchiseStarsEarned: number; // lifetime Stars earned; never decreases; drives rank
+  franchiseStarsEarned: number; // Stars earned today; drives rank; wiped at midnight
+  bestFranchiseStars: number; // most Stars earned in a single day; survives the daily reset
   franchiseUpgrades: string[]; // owned franchise upgrade ids
   cravingMatchDays: number; // days this week the day-end flavour matched the craving
   lastWeekStars: WeekStarAward | null; // Star breakdown for the last completed week
@@ -120,12 +130,17 @@ export interface GameState {
   todayClicks: number;
   dailySnapshots: DailySnapshot[];
 
+  // --- end-of-day choices ---
+  pendingDayChoices: string[] | null; // 3 choice ids awaiting a pick (or decline)
+  activeDayModifierId: string | null; // modifier applied to the current day
+
   // --- actions ---
   addCurry: (amount: number) => void;
   registerClick: () => void;
   setAudio: (
     patch: Partial<Pick<GameState, "sfxOn" | "musicOn" | "sfxVolume" | "musicVolume">>,
   ) => void;
+  toggleDark: () => void;
   completeOnboarding: () => void;
   replayOnboarding: () => void;
   toggleIngredient: (id: string) => void;
@@ -136,6 +151,8 @@ export interface GameState {
   togglePause: () => void;
   setPaused: (paused: boolean) => void;
   ensureCurrentWeek: () => void;
+  ensureCurrentDate: () => void;
+  chooseDayModifier: (id: string | null) => void;
   startNewWeek: () => void;
   hardReset: () => void;
 
@@ -161,6 +178,36 @@ export interface GameState {
 }
 
 const initialWeekId = getCurrentWeekId();
+const initialDateId = getCurrentDateId();
+
+// Journal Insight (franchise): pre-reveal N affinity pairs, seeded so the same
+// pairs appear across reloads. Used at week start and at date reseed.
+function insightAffinities(
+  seed: number,
+  franchiseUpgrades: string[],
+): Record<string, number> {
+  const discoveredAffinities: Record<string, number> = {};
+  const insightPairs = journalInsightPairs(franchiseUpgrades);
+  if (insightPairs <= 0) return discoveredAffinities;
+  const { matrix } = getAffinityData(seed);
+  const ids = unlockedIngredientIds(franchiseUpgrades);
+  const rng = makeRng(`${seed}-insight`);
+  let attempts = 0;
+  while (
+    ids.length >= 2 &&
+    Object.keys(discoveredAffinities).length < insightPairs &&
+    attempts < 500
+  ) {
+    attempts++;
+    const a = ids[Math.floor(rng() * ids.length)];
+    const b = ids[Math.floor(rng() * ids.length)];
+    if (a === b) continue;
+    const key = affinityPairKey(a, b);
+    if (discoveredAffinities[key] !== undefined) continue;
+    discoveredAffinities[key] = matrix[a]?.[b] ?? 0;
+  }
+  return discoveredAffinities;
+}
 
 // Active recipe tier for the current slots, including decoration spice bonus.
 function currentTier(s: GameState): RecipeTier {
@@ -194,10 +241,15 @@ export const useGameStore = create<GameState>()(
       highScore: 0,
       clicksThisWeek: 0,
 
+      dateId: initialDateId,
+      dailyCurry: 0,
+      trophies: {},
+
       sfxOn: true,
       musicOn: true,
       sfxVolume: 1,
       musicVolume: 0.7,
+      darkMode: false,
       hasOnboarded: false,
 
       slots: [...EMPTY_SLOTS],
@@ -220,6 +272,7 @@ export const useGameStore = create<GameState>()(
 
       franchiseStars: 0,
       franchiseStarsEarned: 0,
+      bestFranchiseStars: 0,
       franchiseUpgrades: [],
       cravingMatchDays: 0,
       lastWeekStars: null,
@@ -229,7 +282,7 @@ export const useGameStore = create<GameState>()(
 
       phase: "cooking",
       weekId: initialWeekId,
-      seed: seedFromWeekId(initialWeekId),
+      seed: seedFromWeekId(initialDateId),
       currentDay: 1,
       dayProgress: 0,
       dayStarted: false,
@@ -238,6 +291,9 @@ export const useGameStore = create<GameState>()(
       todayCurry: 0,
       todayClicks: 0,
       dailySnapshots: [],
+
+      pendingDayChoices: null,
+      activeDayModifierId: null,
 
       addCurry: (amount) =>
         set((s) => {
@@ -248,6 +304,7 @@ export const useGameStore = create<GameState>()(
             weekCurry,
             highScore: Math.max(weekCurry, s.highScore),
             todayCurry: s.todayCurry + amount,
+            dailyCurry: s.dailyCurry + amount,
           };
         }),
 
@@ -258,6 +315,8 @@ export const useGameStore = create<GameState>()(
         })),
 
       setAudio: (patch) => set(patch),
+
+      toggleDark: () => set((s) => ({ darkMode: !s.darkMode })),
 
       completeOnboarding: () => set({ hasOnboarded: true }),
 
@@ -296,8 +355,7 @@ export const useGameStore = create<GameState>()(
         get().recomputeDerived();
       },
 
-      advanceDayProgress: (frac) => {
-        const weeksBefore = get().weeksCompleted;
+      advanceDayProgress: (frac) =>
         set((s) => {
           // Clock only runs while the day is open (player pressed Start Day)
           // and not paused.
@@ -318,6 +376,8 @@ export const useGameStore = create<GameState>()(
           let franchiseStars = s.franchiseStars;
           let franchiseStarsEarned = s.franchiseStarsEarned;
           let lastWeekStars = s.lastWeekStars;
+          let pendingDayChoices = s.pendingDayChoices;
+          let activeDayModifierId = s.activeDayModifierId;
 
           const tierAtDayEnd = currentTier(s);
 
@@ -367,6 +427,9 @@ export const useGameStore = create<GameState>()(
             todayClicks = 0;
             currentDay += 1;
             dayStarted = false; // the next day waits for Start Day (clears any pause below)
+            // The day's modifier expires with the day; the next day's choices
+            // are offered below (never at week end — the week summary takes over).
+            activeDayModifierId = null;
 
             if (currentDay > 7) {
               phase = "week_summary";
@@ -400,6 +463,7 @@ export const useGameStore = create<GameState>()(
               lastWeekStars = { total, reasons };
             } else {
               dayProgress = 0; // hold at the start of the next day
+              pendingDayChoices = pickDayChoiceIds(s.seed, currentDay);
             }
           }
 
@@ -412,6 +476,8 @@ export const useGameStore = create<GameState>()(
             dailySnapshots: snapshots,
             todayCurry,
             todayClicks,
+            pendingDayChoices,
+            activeDayModifierId,
             recipeStreakDays: streakDays,
             recipeStreakMultiplier: streakMult,
             weeksCompleted,
@@ -421,15 +487,7 @@ export const useGameStore = create<GameState>()(
             franchiseStarsEarned,
             lastWeekStars,
           };
-        });
-        const s2 = get();
-        if (s2.weeksCompleted > weeksBefore) {
-          // Submit the just-completed week's curry total to the Steam
-          // leaderboard (no-op off-desktop). weekCurry isn't reset until
-          // startNewWeek, so it still holds the final total here.
-          submitWeekScore(s2.weekCurry);
-        }
-      },
+        }),
 
       startDay: () =>
         set((s) =>
@@ -449,37 +507,58 @@ export const useGameStore = create<GameState>()(
       ensureCurrentWeek: () => {
         const id = getCurrentWeekId();
         if (get().weekId === id) return;
-        set({ weekId: id, seed: seedFromWeekId(id) });
+        set({ weekId: id });
         get().startNewWeek();
       },
 
+      ensureCurrentDate: () => {
+        const id = getCurrentDateId();
+        const s = get();
+        if (s.dateId === id) return;
+
+        // Finalize yesterday's daily-leaderboard placement into a trophy
+        // before anything resets. Days with no play earn nothing.
+        let trophies = s.trophies;
+        if (s.dailyCurry > 0) {
+          const rivals = getDailyRivals(seedFromWeekId(s.dateId), s.highScore);
+          const tier = trophyTierFor(placementFor(s.dailyCurry, rivals));
+          if (tier) trophies = { ...trophies, [tier]: (trophies[tier] ?? 0) + 1 };
+          // Record the finished day's total on Steam (no-op off-desktop).
+          submitWeekScore(s.dailyCurry);
+        }
+
+        // A new real day is a full prestige reset: record the daily-stars
+        // record, wipe the franchise layer + curry + prestige level, then let
+        // startNewWeek reset all week-scoped state (upgrades, discoveries,
+        // streaks) against the new seed. Profile records (highScore, trophies,
+        // badges, bestFranchiseStars) and cosmetics survive.
+        set({
+          dateId: id,
+          seed: seedFromWeekId(id),
+          weekId: getCurrentWeekId(), // keep ensureCurrentWeek from re-resetting
+          dailyCurry: 0,
+          trophies,
+          bestFranchiseStars: Math.max(s.bestFranchiseStars, s.franchiseStarsEarned),
+          franchiseStars: 0,
+          franchiseStarsEarned: 0,
+          franchiseUpgrades: [],
+          lastWeekStars: null,
+          currentCurry: 0,
+          weeksCompleted: 0,
+        });
+        get().startNewWeek();
+      },
+
+      chooseDayModifier: (id) =>
+        set((s) =>
+          s.pendingDayChoices
+            ? { pendingDayChoices: null, activeDayModifierId: id }
+            : {},
+        ),
+
       startNewWeek: () => {
         const s = get();
-        const seed = s.seed;
-
-        // Journal Insight (franchise): pre-reveal N affinity pairs, seeded from
-        // the week seed so the same pairs appear across reloads.
-        const insightPairs = journalInsightPairs(s.franchiseUpgrades);
-        const discoveredAffinities: Record<string, number> = {};
-        if (insightPairs > 0) {
-          const { matrix } = getAffinityData(seed);
-          const ids = unlockedIngredientIds(s.franchiseUpgrades);
-          const rng = makeRng(`${seed}-insight`);
-          let attempts = 0;
-          while (
-            ids.length >= 2 &&
-            Object.keys(discoveredAffinities).length < insightPairs &&
-            attempts < 500
-          ) {
-            attempts++;
-            const a = ids[Math.floor(rng() * ids.length)];
-            const b = ids[Math.floor(rng() * ids.length)];
-            if (a === b) continue;
-            const key = affinityPairKey(a, b);
-            if (discoveredAffinities[key] !== undefined) continue;
-            discoveredAffinities[key] = matrix[a]?.[b] ?? 0;
-          }
-        }
+        const discoveredAffinities = insightAffinities(s.seed, s.franchiseUpgrades);
 
         // Head Start (franchise): grant curry at the top of the week.
         const headStart = headStartCurry(s.franchiseUpgrades);
@@ -510,6 +589,8 @@ export const useGameStore = create<GameState>()(
           claimedSets: [],
           maxSlotsUsed: 0,
           cravingMatchDays: 0,
+          pendingDayChoices: null,
+          activeDayModifierId: null,
         });
         get().recomputeDerived();
         get().refreshBadges();
@@ -517,12 +598,16 @@ export const useGameStore = create<GameState>()(
 
       hardReset: () => {
         const id = getCurrentWeekId();
+        const dateId = getCurrentDateId();
         set({
           currentCurry: 0,
           totalCurryAllTime: 0,
           weekCurry: 0,
           highScore: 0,
           clicksThisWeek: 0,
+          dateId,
+          dailyCurry: 0,
+          trophies: {},
           hasOnboarded: true, // already a returning player; don't replay tutorial
           slots: [...EMPTY_SLOTS],
           ownedDecorations: {},
@@ -541,6 +626,7 @@ export const useGameStore = create<GameState>()(
           maxSlotsUsed: 0,
           franchiseStars: 0,
           franchiseStarsEarned: 0,
+          bestFranchiseStars: 0,
           franchiseUpgrades: [],
           cravingMatchDays: 0,
           lastWeekStars: null,
@@ -548,7 +634,7 @@ export const useGameStore = create<GameState>()(
           activeSkin: "default",
           phase: "cooking",
           weekId: id,
-          seed: seedFromWeekId(id),
+          seed: seedFromWeekId(dateId),
           currentDay: 1,
           dayProgress: 0,
           dayStarted: false,
@@ -557,6 +643,8 @@ export const useGameStore = create<GameState>()(
           todayCurry: 0,
           todayClicks: 0,
           dailySnapshots: [],
+          pendingDayChoices: null,
+          activeDayModifierId: null,
         });
       },
 
@@ -903,6 +991,20 @@ export const useGameStore = create<GameState>()(
           p.musicVolume = 0.7;
           delete p.soundOn;
         }
+        if (version < 11) {
+          // Daily leaderboard + end-of-day choices. The seed is now derived
+          // from the calendar date; ensureCurrentDate reseeds on first load.
+          p.dateId = p.dateId ?? "";
+          p.dailyCurry = p.dailyCurry ?? 0;
+          p.trophies = p.trophies ?? {};
+          p.pendingDayChoices = p.pendingDayChoices ?? null;
+          p.activeDayModifierId = p.activeDayModifierId ?? null;
+        }
+        if (version < 12) {
+          // Prestige became a daily loop; seed the all-time record from the
+          // old lifetime total so existing players don't open to 0.
+          p.bestFranchiseStars = p.bestFranchiseStars ?? p.franchiseStarsEarned ?? 0;
+        }
         return p as unknown as GameState;
       },
       partialize: (s) => ({
@@ -917,6 +1019,7 @@ export const useGameStore = create<GameState>()(
         musicOn: s.musicOn,
         sfxVolume: s.sfxVolume,
         musicVolume: s.musicVolume,
+        darkMode: s.darkMode,
         hasOnboarded: s.hasOnboarded,
         todayClicks: s.todayClicks,
         slots: s.slots,
@@ -936,6 +1039,7 @@ export const useGameStore = create<GameState>()(
         maxSlotsUsed: s.maxSlotsUsed,
         franchiseStars: s.franchiseStars,
         franchiseStarsEarned: s.franchiseStarsEarned,
+        bestFranchiseStars: s.bestFranchiseStars,
         franchiseUpgrades: s.franchiseUpgrades,
         cravingMatchDays: s.cravingMatchDays,
         lastWeekStars: s.lastWeekStars,
@@ -947,6 +1051,11 @@ export const useGameStore = create<GameState>()(
         currentDay: s.currentDay,
         dayProgress: s.dayProgress,
         dailySnapshots: s.dailySnapshots,
+        dateId: s.dateId,
+        dailyCurry: s.dailyCurry,
+        trophies: s.trophies,
+        pendingDayChoices: s.pendingDayChoices,
+        activeDayModifierId: s.activeDayModifierId,
       }),
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Record<string, unknown>;
@@ -960,6 +1069,7 @@ export const useGameStore = create<GameState>()(
           weekCurry: num(p.weekCurry),
           highScore: num(p.highScore),
           todayCurry: num(p.todayCurry),
+          dailyCurry: num(p.dailyCurry),
           autoProduction: num(p.autoProduction),
           dailySnapshots: ((p.dailySnapshots as DailySnapshot[]) ?? []).map(
             (snap) => ({ ...snap, curry: Number(snap.curry) }),
@@ -973,3 +1083,14 @@ export const useGameStore = create<GameState>()(
     },
   ),
 );
+
+// Dark mode lives on <html> so Tailwind's `.dark` variables apply everywhere,
+// including body-portaled modals. Applied here (not a component effect) so it
+// runs before first render, and the subscribe covers rehydration on desktop
+// (async save file), toggles, hard resets, and save imports alike.
+const applyDark = (on: boolean) =>
+  document.documentElement.classList.toggle("dark", on);
+applyDark(useGameStore.getState().darkMode);
+useGameStore.subscribe((s, prev) => {
+  if (s.darkMode !== prev.darkMode) applyDark(s.darkMode);
+});
