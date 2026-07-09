@@ -29,6 +29,7 @@ import { ArcadeButton } from "../components/arcade/ArcadeButton";
 import { ArcadePanel } from "../components/arcade/ArcadePanel";
 import { IS_DEMO, DEMO_DECORATIONS } from "../target";
 import { SteamCta } from "../components/SteamCta";
+import { FeedbackModal } from "../components/FeedbackModal";
 import { useCrazyCurry } from "../hooks/useCrazyCurry";
 import { useOnFire } from "../hooks/useOnFire";
 import { UPGRADES, DECORATIONS, upgradeCost } from "../engine/shopData";
@@ -114,6 +115,7 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
   const onFire = useOnFire();
   const [cookSignal, setCookSignal] = useState(0);
   const [namingFp, setNamingFp] = useState<string | null>(null);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const sceneWrapRef = useRef<HTMLDivElement>(null);
 
   const filled = slots.filter(Boolean) as string[];
@@ -531,6 +533,14 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
             />
           </div>
           <SteamCta label="Get the full game on Steam" />
+          <button
+            type="button"
+            onClick={() => setFeedbackOpen(true)}
+            className="arcade-btn flex items-center justify-center gap-2 bg-white py-3 uppercase text-ink"
+          >
+            <Icon name="mail" size={22} />
+            Contact us
+          </button>
         </ArcadePanel>
       ) : (
       <ArcadePanel className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -631,6 +641,8 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
       {namingFp && (
         <RecipeNamingModal fingerprint={namingFp} onClose={() => setNamingFp(null)} />
       )}
+
+      {feedbackOpen && <FeedbackModal onClose={() => setFeedbackOpen(false)} />}
     </div>
   );
 }
