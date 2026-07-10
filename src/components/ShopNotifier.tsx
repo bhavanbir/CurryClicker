@@ -71,7 +71,7 @@ export function ShopNotifier({ onOpenShop }: { onOpenShop: () => void }) {
   }, [currentCurry, purchasedUpgrades, ownedDecorations, weeksCompleted]);
 
   return (
-    <div className="pointer-events-none fixed bottom-24 right-3 z-[45] flex flex-col items-end gap-2 md:bottom-4">
+    <div className="cramped-hide pointer-events-none fixed bottom-24 right-3 z-[45] flex flex-col items-end gap-2 md:bottom-4">
       <AnimatePresence>
         {toasts.map((t) => (
           <motion.button

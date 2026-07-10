@@ -12,7 +12,8 @@ export function DayProgressBar() {
   return (
     <div className="w-full">
       <div className="mb-1 flex items-center justify-between text-[11px] font-bold uppercase tracking-wide text-ink/55">
-        <span>
+        {/* duplicates the header's Day chip — first to go when space is tight */}
+        <span className="cramped-hide">
           Day {currentDay}/{DAYS_PER_WEEK}
         </span>
         <span className={dayStarted ? "" : "text-primary"}>

@@ -78,6 +78,29 @@ export function computeRecipeFlavor(slots: (string | null)[]): Flavor | null {
   return tied ? "unique" : best;
 }
 
+// Random decent recipe: sample `slotCount` distinct ingredients and keep the
+// first neutral-to-great draw — never terrible, and never a free legendary
+// (falls back to the last sample if 40 draws all miss).
+export function randomNeutralRecipe(
+  ids: string[],
+  slotCount: number,
+  matrix: AffinityMatrix,
+): string[] {
+  const count = Math.min(slotCount, ids.length);
+  let sample: string[] = [];
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const pool = [...ids];
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    sample = pool.slice(0, count);
+    const tier = computeRecipeScore(sample, matrix).tier;
+    if (tier !== "terrible" && tier !== "legendary") return sample;
+  }
+  return sample;
+}
+
 export interface ScoreOptions {
   // Flat affinity added to every spice/spice pair (Spice Rack Deluxe decoration).
   spicePairBonus?: number;

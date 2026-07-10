@@ -5,7 +5,6 @@ import { WALL_SLOTS } from "./walls";
 import { SKIN_ORDER, SKINS } from "./skins";
 import { Icon } from "../components/arcade/Icon";
 import { PixelIcon } from "../components/PixelIcon";
-import { IS_DEMO } from "../target";
 
 // In-scene "Decorate" mode: pick an owned decoration from the tray, then tap a
 // floor cell to drop it (snapped to the grid). Also swaps the restaurant skin.
@@ -115,27 +114,18 @@ export function SceneEditor({ onClose }: { onClose: () => void }) {
             {SKIN_ORDER.map((id) => {
               const pal = SKINS[id];
               const active = activeSkin === id;
-              const steamLocked = IS_DEMO && id !== "default";
               return (
                 <button
                   key={id}
                   type="button"
-                  disabled={steamLocked}
                   onClick={() => setActiveSkin(id)}
-                  title={
-                    steamLocked
-                      ? `${pal.label} — available in the full game on Steam`
-                      : pal.label
-                  }
-                  className={`flex h-7 items-center gap-1 rounded-md border-2 px-1.5 ${
-                    steamLocked
-                      ? "cursor-not-allowed border-dashed border-ink/40 opacity-60 grayscale"
-                      : "border-ink"
-                  } ${active ? "ring-2 ring-primary" : ""}`}
+                  title={pal.label}
+                  className={`flex h-7 items-center gap-1 rounded-md border-2 border-ink px-1.5 ${
+                    active ? "ring-2 ring-primary" : ""
+                  }`}
                   style={{ background: `linear-gradient(${pal.wallFrom}, ${pal.floor})` }}
                 >
-                  <span className="flex items-center gap-0.5 rounded bg-white/70 px-1 text-[9px] font-black text-ink">
-                    {steamLocked && <Icon name="lock" fill size={10} />}
+                  <span className="rounded bg-white/70 px-1 text-[9px] font-black text-ink">
                     {pal.label}
                   </span>
                 </button>

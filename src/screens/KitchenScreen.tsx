@@ -3,6 +3,7 @@ import { useGameStore } from "../store/useGameStore";
 import { useRecipeScore } from "../hooks/useRecipeScore";
 import { getAffinityData } from "../engine/affinityEngine";
 import { getDailyCraving } from "../engine/weekEngine";
+import { randomNeutralRecipe } from "../engine/recipeEngine";
 import { CATEGORIES, INGREDIENT_LIST, INGREDIENTS } from "../engine/ingredients";
 import { unlockedIngredientIds } from "../engine/franchiseData";
 import { IS_DEMO, DEMO_LOCKED_INGREDIENT_SET } from "../target";
@@ -33,6 +34,7 @@ export function KitchenScreen({ onNavigate }: Props) {
   const franchiseUpgrades = useGameStore((s) => s.franchiseUpgrades);
   const setIngredient = useGameStore((s) => s.setIngredient);
   const toggleIngredient = useGameStore((s) => s.toggleIngredient);
+  const setRecipe = useGameStore((s) => s.setRecipe);
   const clearRecipe = useGameStore((s) => s.clearRecipe);
 
   const score = useRecipeScore();
@@ -107,6 +109,15 @@ export function KitchenScreen({ onNavigate }: Props) {
               <FlavorTag flavor={score.flavor} craving={craving} tier={score.tier} />
             </div>
             <div className="flex gap-2">
+              <ArcadeButton
+                size="sm"
+                onClick={() =>
+                  setRecipe(randomNeutralRecipe([...unlockedIds], unlockedSlots, matrix))
+                }
+              >
+                <Icon name="casino" size={18} />
+                Random
+              </ArcadeButton>
               <ArcadeButton size="sm" onClick={clearRecipe} disabled={filledCount === 0}>
                 <Icon name="delete" size={18} />
                 Clear

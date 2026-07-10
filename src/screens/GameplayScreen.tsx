@@ -10,7 +10,7 @@ import { getDailySpecial, getDailyCraving } from "../engine/weekEngine";
 import { DAY_CHOICE_MAP } from "../engine/dayChoices";
 import { INGREDIENTS } from "../engine/ingredients";
 import { formatCurry } from "../lib/format";
-import { playCook, playDiscovery } from "../lib/sfx";
+import { playCook } from "../lib/sfx";
 import type { Screen } from "../navigation";
 import { ScoreDisplay } from "../components/ScoreDisplay";
 import { DayProgressBar } from "../components/DayProgressBar";
@@ -19,7 +19,8 @@ import { RestaurantScene } from "../scene/RestaurantScene";
 import { FloatText, type Float } from "../components/FloatText";
 import { ClickBurst } from "../components/ClickBurst";
 import { PixelIcon } from "../components/PixelIcon";
-import { TodayStrip } from "../components/TodayStrip";
+import { CravingBar } from "../components/CravingBar";
+import { StartDayModal } from "../components/StartDayModal";
 import { ChefSpecialPanel } from "../components/ChefSpecialPanel";
 import { FlavorTag } from "../components/FlavorTag";
 import { RecipeNamingModal } from "../components/RecipeNamingModal";
@@ -95,6 +96,7 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
   const discoveredAffinities = useGameStore((s) => s.discoveredAffinities);
   const franchiseStarsEarned = useGameStore((s) => s.franchiseStarsEarned);
   const activeDayModifierId = useGameStore((s) => s.activeDayModifierId);
+  const todayClicks = useGameStore((s) => s.todayClicks);
   const dayMod = activeDayModifierId ? DAY_CHOICE_MAP[activeDayModifierId] : undefined;
 
   const demoEnded = IS_DEMO && weeksCompleted >= 1;
@@ -116,6 +118,7 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
   const [cookSignal, setCookSignal] = useState(0);
   const [namingFp, setNamingFp] = useState<string | null>(null);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [startDayOpen, setStartDayOpen] = useState(false);
   const sceneWrapRef = useRef<HTMLDivElement>(null);
 
   const filled = slots.filter(Boolean) as string[];
@@ -169,19 +172,6 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
     if (result.isSpecial) claimSpecial(currentDay);
     const outcome = logCook(slots);
     if (outcome.needsNaming) setNamingFp(outcome.fingerprint);
-    if (outcome.rumorReward) {
-      playDiscovery("legendary");
-      shakeScene("lg");
-      const rid = floatId++;
-      const rumorLabel = `Rumor solved! +${formatCurry(outcome.rumorReward)}`;
-      setFloats((f) =>
-        [...f, { id: rid, x, y: y - 60, label: rumorLabel }].slice(-12),
-      );
-      window.setTimeout(
-        () => setFloats((f) => f.filter((fl) => fl.id !== rid)),
-        800,
-      );
-    }
     if (outcome.tastedPairs > 0) {
       const tasteId = floatId++;
       setFloats((f) =>
@@ -370,10 +360,6 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
 
       <DayProgressBar />
 
-      <TodayStrip event={crazy.event} nextEventAt={crazy.nextEventAt} />
-
-      {!demoEnded && <GoalBar onOpenShop={onOpenShop} />}
-
       {/* Restaurant scene + floats */}
       <div ref={sceneWrapRef} className="relative">
         <ChefSpecialPanel />
@@ -491,6 +477,22 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
           </div>
         )}
 
+        {/* First-cook hint — sits over the scene until the first tap lands */}
+        <AnimatePresence>
+          {dayStarted && !dayPaused && hasRecipe && todayClicks === 0 && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center"
+            >
+              <span className="animate-bounce rounded-xl border-4 border-ink bg-white px-4 py-2 font-display text-lg font-black uppercase text-ink shadow-arcade">
+                👆 Tap here to cook!
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
       </div>
 
       {/* Active recipe bar */}
@@ -572,7 +574,7 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
                   +{formatCurry(perCook)} / cook
                 </span>
                 {hasUntastedPair && (
-                  <span className="flex items-center gap-1 text-sm font-bold text-ink/60">
+                  <span className="cramped-hide flex items-center gap-1 text-sm font-bold text-ink/60">
                     <Icon name="science" size={16} />
                     Tasting… {tasteCount}/{TASTE_COOKS_TO_REVEAL}
                   </span>
@@ -603,11 +605,12 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
         <ArcadeButton
           size="xl"
           variant={!hasRecipe ? "tertiary" : !dayStarted || dayPaused ? "buy" : "primary"}
+          className={!hasRecipe || (!dayStarted && !dayPaused) ? "animate-pulse" : undefined}
           onClick={
             !hasRecipe
               ? () => onNavigate("kitchen")
               : !dayStarted
-                ? startDay
+                ? () => setStartDayOpen(true)
                 : dayPaused
                   ? togglePause
                   : cookFromButton
@@ -636,6 +639,24 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
           )}
         </ArcadeButton>
       </ArcadePanel>
+      )}
+
+      {!demoEnded && <GoalBar onOpenShop={onOpenShop} />}
+
+      {!demoEnded && <CravingBar />}
+
+      {startDayOpen && (
+        <StartDayModal
+          onStart={() => {
+            setStartDayOpen(false);
+            startDay();
+          }}
+          onChangeRecipe={() => {
+            setStartDayOpen(false);
+            onNavigate("kitchen");
+          }}
+          onClose={() => setStartDayOpen(false)}
+        />
       )}
 
       {namingFp && (

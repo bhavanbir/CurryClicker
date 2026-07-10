@@ -24,9 +24,9 @@ export const DAY_CHOICES: DayModifier[] = [
     name: "Ghost Pepper Rush",
     icon: "local_fire_department",
     bonus: "Every cook is worth ×100",
-    cost: "The day lasts only 10 seconds",
+    cost: "The day lasts only 5 seconds",
     clickMult: 100,
-    daySeconds: 10,
+    daySeconds: 5,
   },
   {
     id: "bubble_bonanza",
@@ -81,10 +81,12 @@ export const DAY_CHOICE_MAP: Record<string, DayModifier> = Object.fromEntries(
   DAY_CHOICES.map((c) => [c.id, c]),
 );
 
-// 3 distinct choice ids for the day, deterministic per (seed, day).
-export function pickDayChoiceIds(seed: number, day: number): string[] {
+// Up to 3 distinct choice ids for the day, deterministic per (seed, day).
+// `exclude` drops modifiers already picked this week — once chosen, a deal
+// doesn't reappear until the weekly reset.
+export function pickDayChoiceIds(seed: number, day: number, exclude: string[] = []): string[] {
   const rng = makeRng(`${seed}-daychoices-${day}`);
-  const pool = [...DAY_CHOICES];
+  const pool = DAY_CHOICES.filter((c) => !exclude.includes(c.id));
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
     [pool[i], pool[j]] = [pool[j], pool[i]];

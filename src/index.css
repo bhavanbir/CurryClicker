@@ -39,8 +39,9 @@
 /* Theme neutrals as RGB channels (see tailwind.config.js). Accents stay fixed. */
 :root {
   color-scheme: light;
-  --ink: 25 28 30; /* text/borders/shadows */
+  --ink: 25 28 30; /* text/borders */
   --ink-bg: 25 28 30; /* bg-ink scrims + chips — stays dark in both themes */
+  --shadow: 25 28 30; /* hard offset shadows — stays dark in both themes */
   --surface: 255 255 255; /* bg-white panels */
   --cream: 255 253 248;
   --cream-50: 255 249 240;
@@ -48,16 +49,20 @@
   --cream-200: 247 249 252;
   --tertiary-fixed: 255 222 170;
 }
+/* Dark = the light palette's warm cream/orange world in coffee tones: warm
+   off-white ink, elevated brown panels, and shadows that stay dark (shadows
+   must never flip light with --ink — that was the old glowing-shadow bug). */
 .dark {
   color-scheme: dark;
-  --ink: 240 234 222;
-  --ink-bg: 0 0 0;
-  --surface: 38 34 30;
-  --cream: 23 20 17;
-  --cream-50: 31 27 23;
-  --cream-100: 44 38 32;
-  --cream-200: 36 39 44;
-  --tertiary-fixed: 74 53 18;
+  --ink: 228 218 204;
+  --ink-bg: 20 17 14;
+  --shadow: 22 18 14;
+  --surface: 54 46 39;
+  --cream: 34 29 24;
+  --cream-50: 41 35 29;
+  --cream-100: 62 53 44;
+  --cream-200: 48 42 36;
+  --tertiary-fixed: 110 78 34;
 }
 
 html,
@@ -80,6 +85,13 @@ body {
   user-select: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Dark mode keeps the warm curry glow — slightly stronger so it doesn't go flat */
+.dark body {
+  background-image:
+    radial-gradient(1100px 500px at 50% -8%, rgba(255, 140, 0, 0.16), transparent 60%),
+    linear-gradient(rgb(var(--cream)), rgb(var(--cream-100)));
 }
 
 /* Material Symbols — fixed metrics so icons never shift layout */
@@ -110,7 +122,7 @@ body {
   /* Static bordered panel with hard offset shadow */
   .arcade-box {
     @apply border-4 border-ink bg-white rounded-xl;
-    box-shadow: 6px 6px 0 0 rgb(var(--ink));
+    box-shadow: 6px 6px 0 0 rgb(var(--shadow));
   }
 
   /* Heavy wooden diorama frame for the restaurant scene — visually distinct
@@ -120,7 +132,18 @@ body {
     border: 6px solid #523014;
     box-shadow:
       inset 0 0 0 4px #a9702f,
-      6px 6px 0 0 rgb(var(--ink));
+      6px 6px 0 0 rgb(var(--shadow));
+  }
+
+  /* Dark mode: the diorama frame trades wood for Neon Night — deep purple
+     timber, hot-pink inset, soft pink glow (palette from skins.ts `neon`). */
+  .dark .scene-frame {
+    border-color: #2b2350;
+    box-shadow:
+      inset 0 0 0 4px #ff4fa3,
+      inset 0 0 14px 4px rgba(255, 79, 163, 0.45),
+      0 0 24px 2px rgba(255, 79, 163, 0.4),
+      6px 6px 0 0 rgb(var(--shadow));
   }
 
   /* Shop drawer surface + awning — market-stall stripes so the store reads
@@ -144,15 +167,15 @@ body {
   /* Interactive control: lifts on hover, presses down on active */
   .arcade-btn {
     @apply border-4 border-ink rounded-lg transition-all duration-100 font-display font-extrabold;
-    box-shadow: 4px 4px 0 0 rgb(var(--ink));
+    box-shadow: 4px 4px 0 0 rgb(var(--shadow));
   }
   .arcade-btn:hover:not(:disabled) {
     transform: translate(-1px, -1px);
-    box-shadow: 5px 5px 0 0 rgb(var(--ink));
+    box-shadow: 5px 5px 0 0 rgb(var(--shadow));
   }
   .arcade-btn:active:not(:disabled) {
     transform: translate(4px, 4px);
-    box-shadow: 0 0 0 0 rgb(var(--ink));
+    box-shadow: 0 0 0 0 rgb(var(--shadow));
   }
   .arcade-btn:disabled {
     @apply opacity-50 cursor-not-allowed;
@@ -162,6 +185,14 @@ body {
   .text-stroke-ink {
     -webkit-text-stroke: 1.5px rgb(var(--ink));
     paint-order: stroke fill;
+  }
+}
+
+/* Cramped viewports (tiny phones, short windows): hide floating toasts and
+   nice-to-have labels — gameplay controls always win the space fight. */
+@media (max-width: 479px), (max-height: 559px) {
+  .cramped-hide {
+    display: none !important;
   }
 }
 

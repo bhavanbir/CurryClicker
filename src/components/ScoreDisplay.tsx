@@ -55,7 +55,7 @@ export function ScoreDisplay() {
         type="button"
         onClick={() => setOpen((o) => !o)}
         title="What does High mean?"
-        className="mt-0.5 text-[10px] font-bold uppercase tracking-widest text-ink/55 underline decoration-dotted underline-offset-2"
+        className="cramped-hide mt-0.5 text-[10px] font-bold uppercase tracking-widest text-ink/55 underline decoration-dotted underline-offset-2"
       >
         High {formatScore(highScore)}
       </button>

@@ -75,10 +75,11 @@ export default {
         container: "1200px",
       },
       boxShadow: {
-        "arcade-sm": "2px 2px 0 0 rgb(var(--ink))",
-        arcade: "4px 4px 0 0 rgb(var(--ink))",
-        "arcade-lg": "6px 6px 0 0 rgb(var(--ink))",
-        "arcade-xl": "8px 8px 0 0 rgb(var(--ink))",
+        // --shadow stays dark in both themes (--ink flips light in dark mode)
+        "arcade-sm": "2px 2px 0 0 rgb(var(--shadow))",
+        arcade: "4px 4px 0 0 rgb(var(--shadow))",
+        "arcade-lg": "6px 6px 0 0 rgb(var(--shadow))",
+        "arcade-xl": "8px 8px 0 0 rgb(var(--shadow))",
       },
       keyframes: {
         "steam-rise": {

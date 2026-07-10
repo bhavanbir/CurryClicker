@@ -51,7 +51,7 @@ export function BadgeNotifier({ onOpenProfile }: { onOpenProfile: () => void }) 
   }, [unlockedBadges]);
 
   return (
-    <div className="pointer-events-none fixed bottom-44 right-3 z-[45] flex flex-col items-end gap-2 md:bottom-24">
+    <div className="cramped-hide pointer-events-none fixed bottom-44 right-3 z-[45] flex flex-col items-end gap-2 md:bottom-24">
       <AnimatePresence>
         {toasts.map((t) => (
           <motion.button

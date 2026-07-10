@@ -16,7 +16,6 @@ import {
   seedFromWeekId,
   evaluateStreak,
   getDailyCraving,
-  getWeeklyRumor,
 } from "../engine/weekEngine";
 import { getDailyRivals, placementFor, trophyTierFor } from "../engine/dailyRivals";
 import { pickDayChoiceIds } from "../engine/dayChoices";
@@ -25,6 +24,7 @@ import { getAffinityData, affinityPairKey } from "../engine/affinityEngine";
 import {
   computeRecipeScore,
   computeRecipeFlavor,
+  randomNeutralRecipe,
   TIER_ORDER,
 } from "../engine/recipeEngine";
 import { computeEffects } from "../engine/effects";
@@ -41,7 +41,7 @@ import {
 import { makeRng } from "../lib/rng";
 import { WALL_PLACE_ORDER } from "../scene/walls";
 import { BASE_UNLOCKED_SLOTS, TASTE_COOKS_TO_REVEAL } from "../config";
-import { IS_DEMO, DEMO_DECORATIONS } from "../target";
+import { IS_DEMO, DEMO_DECORATIONS, DEMO_LOCKED_INGREDIENT_SET } from "../target";
 
 export const SAVE_KEY = "curry-clicker-save";
 export const SAVE_VERSION = 12;
@@ -56,7 +56,6 @@ export interface CookOutcome {
   isNewDiscovery: boolean;
   needsNaming: boolean; // first great/legendary craft of this recipe
   tastedPairs: number; // pairs newly revealed by this cook (taste-to-reveal)
-  rumorReward?: number; // curry paid out for cooking the Weekly Rumor
 }
 
 const EMPTY_SLOTS: (string | null)[] = [null, null, null, null, null];
@@ -99,7 +98,6 @@ export interface GameState {
   // Affinity Journal: pair-key (affinityPairKey) -> true affinity, filled in as
   // recipes are cooked through day-end. Undefined = pair not yet tested. Weekly.
   discoveredAffinities: Record<string, number>;
-  rumorClaimed: boolean; // this week's Rumored Recipe cooked & paid out
   claimedSets: string[]; // collection sets claimed this week
   unlockedBadges: string[]; // cumulative, never un-earned
   weeksCompleted: number;
@@ -131,8 +129,9 @@ export interface GameState {
   dailySnapshots: DailySnapshot[];
 
   // --- end-of-day choices ---
-  pendingDayChoices: string[] | null; // 3 choice ids awaiting a pick (or decline)
+  pendingDayChoices: string[] | null; // up to 3 choice ids awaiting a pick (or decline)
   activeDayModifierId: string | null; // modifier applied to the current day
+  usedDayModifierIds: string[]; // picked this week — excluded until the weekly reset
 
   // --- actions ---
   addCurry: (amount: number) => void;
@@ -145,6 +144,7 @@ export interface GameState {
   replayOnboarding: () => void;
   toggleIngredient: (id: string) => void;
   setIngredient: (slot: number, id: string | null) => void;
+  setRecipe: (ids: string[]) => void;
   clearRecipe: () => void;
   advanceDayProgress: (frac: number) => void;
   startDay: () => void;
@@ -264,7 +264,6 @@ export const useGameStore = create<GameState>()(
       highestTierSeen: "none",
       discoveredRecipes: {},
       discoveredAffinities: {},
-      rumorClaimed: false,
       claimedSets: [],
       unlockedBadges: [],
       weeksCompleted: 0,
@@ -294,6 +293,7 @@ export const useGameStore = create<GameState>()(
 
       pendingDayChoices: null,
       activeDayModifierId: null,
+      usedDayModifierIds: [],
 
       addCurry: (amount) =>
         set((s) => {
@@ -318,7 +318,19 @@ export const useGameStore = create<GameState>()(
 
       toggleDark: () => set((s) => ({ darkMode: !s.darkMode })),
 
-      completeOnboarding: () => set({ hasOnboarded: true }),
+      completeOnboarding: () => {
+        // Starter recipe: a fresh player lands with something cookable so the
+        // first tap works without a Kitchen detour.
+        const s = get();
+        if (s.slots.every((x) => x === null)) {
+          const ids = unlockedIngredientIds(s.franchiseUpgrades).filter(
+            (id) => !IS_DEMO || !DEMO_LOCKED_INGREDIENT_SET.has(id),
+          );
+          const { matrix } = getAffinityData(s.seed);
+          get().setRecipe(randomNeutralRecipe(ids, s.unlockedSlots, matrix));
+        }
+        set({ hasOnboarded: true });
+      },
 
       replayOnboarding: () => set({ hasOnboarded: false }),
 
@@ -345,6 +357,15 @@ export const useGameStore = create<GameState>()(
           if (slot < 0 || slot >= s.slots.length) return {};
           const slots = [...s.slots];
           slots[slot] = id;
+          return { slots };
+        });
+        get().recomputeDerived();
+      },
+
+      setRecipe: (ids) => {
+        set((s) => {
+          const slots = [...EMPTY_SLOTS];
+          ids.slice(0, s.unlockedSlots).forEach((id, i) => (slots[i] = id));
           return { slots };
         });
         get().recomputeDerived();
@@ -463,7 +484,9 @@ export const useGameStore = create<GameState>()(
               lastWeekStars = { total, reasons };
             } else {
               dayProgress = 0; // hold at the start of the next day
-              pendingDayChoices = pickDayChoiceIds(s.seed, currentDay);
+              // Modifiers picked earlier this week don't come back around.
+              const ids = pickDayChoiceIds(s.seed, currentDay, s.usedDayModifierIds);
+              pendingDayChoices = ids.length > 0 ? ids : null;
             }
           }
 
@@ -552,7 +575,12 @@ export const useGameStore = create<GameState>()(
       chooseDayModifier: (id) =>
         set((s) =>
           s.pendingDayChoices
-            ? { pendingDayChoices: null, activeDayModifierId: id }
+            ? {
+                pendingDayChoices: null,
+                activeDayModifierId: id,
+                usedDayModifierIds:
+                  id !== null ? [...s.usedDayModifierIds, id] : s.usedDayModifierIds,
+              }
             : {},
         ),
 
@@ -585,12 +613,12 @@ export const useGameStore = create<GameState>()(
           highestTierSeen: "none",
           discoveredRecipes: {},
           discoveredAffinities,
-          rumorClaimed: false,
           claimedSets: [],
           maxSlotsUsed: 0,
           cravingMatchDays: 0,
           pendingDayChoices: null,
           activeDayModifierId: null,
+          usedDayModifierIds: [],
         });
         get().recomputeDerived();
         get().refreshBadges();
@@ -619,7 +647,6 @@ export const useGameStore = create<GameState>()(
           highestTierSeen: "none",
           discoveredRecipes: {},
           discoveredAffinities: {},
-          rumorClaimed: false,
           claimedSets: [],
           unlockedBadges: [],
           weeksCompleted: 0,
@@ -645,6 +672,7 @@ export const useGameStore = create<GameState>()(
           dailySnapshots: [],
           pendingDayChoices: null,
           activeDayModifierId: null,
+          usedDayModifierIds: [],
         });
       },
 
@@ -754,8 +782,7 @@ export const useGameStore = create<GameState>()(
           ),
         })),
 
-      setActiveSkin: (skin) =>
-        set(IS_DEMO && skin !== "default" ? {} : { activeSkin: skin }),
+      setActiveSkin: (skin) => set({ activeSkin: skin }),
 
       recomputeDerived: () =>
         set((s) => {
@@ -851,21 +878,8 @@ export const useGameStore = create<GameState>()(
           set({ maxSlotsUsed });
         }
 
-        // Weekly Rumor: superset containment claims it (cooking MORE than the
-        // rumored combo still counts; early guesses before full reveal too).
-        let rumorReward: number | undefined;
-        if (!s.rumorClaimed && ids.length > 0) {
-          const rumor = getWeeklyRumor(s.seed);
-          if (rumor && rumor.every((id) => ids.includes(id))) {
-            // ponytail: 5% of week earnings, floor 2k — scales with the player
-            rumorReward = Math.max(2_000, Math.floor(get().weekCurry * 0.05));
-            set({ rumorClaimed: true });
-            get().addCurry(rumorReward);
-          }
-        }
-
         get().refreshBadges();
-        return { fingerprint, isNewDiscovery, needsNaming, tastedPairs, rumorReward };
+        return { fingerprint, isNewDiscovery, needsNaming, tastedPairs };
       },
 
       claimSet: (id) => {
@@ -1032,7 +1046,6 @@ export const useGameStore = create<GameState>()(
         highestTierSeen: s.highestTierSeen,
         discoveredRecipes: s.discoveredRecipes,
         discoveredAffinities: s.discoveredAffinities,
-        rumorClaimed: s.rumorClaimed,
         claimedSets: s.claimedSets,
         unlockedBadges: s.unlockedBadges,
         weeksCompleted: s.weeksCompleted,
@@ -1056,6 +1069,7 @@ export const useGameStore = create<GameState>()(
         trophies: s.trophies,
         pendingDayChoices: s.pendingDayChoices,
         activeDayModifierId: s.activeDayModifierId,
+        usedDayModifierIds: s.usedDayModifierIds,
       }),
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Record<string, unknown>;
