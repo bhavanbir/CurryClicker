@@ -44,7 +44,7 @@ export function useCrazyCurry(active: boolean) {
       let gap = MIN_GAP_MS + Math.random() * (MAX_GAP_MS - MIN_GAP_MS);
       if (!fired) {
         // Guarantee ≥1 event per day: the first gap must fit inside what's
-        // left of the day (the default 45–90s gap outlives a 60s day).
+        // left of the day (the default 45–90s gap outlives a 45s day).
         // ponytail: soft guarantee — a recipe built in the day's last ~7s
         // can still miss it; force-fire at day end if players notice.
         const remaining =

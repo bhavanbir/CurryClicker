@@ -24,9 +24,9 @@ export const DAY_CHOICES: DayModifier[] = [
     name: "Ghost Pepper Rush",
     icon: "local_fire_department",
     bonus: "Every cook is worth ×100",
-    cost: "The day lasts only 5 seconds",
+    cost: "The day lasts only 4 seconds",
     clickMult: 100,
-    daySeconds: 5,
+    daySeconds: 4,
   },
   {
     id: "bubble_bonanza",

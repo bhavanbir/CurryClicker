@@ -4,7 +4,7 @@
 // loop is observable during development. Override via VITE_WEEK_DURATION_MS.
 // Production value would be 7 * 24 * 60 * 60 * 1000 = 604_800_000.
 export const WEEK_DURATION_MS: number = Number(
-  import.meta.env.VITE_WEEK_DURATION_MS ?? 7 * 60 * 1000, // 7 minutes
+  import.meta.env.VITE_WEEK_DURATION_MS ?? 7 * 45 * 1000, // 45s per day
 );
 
 export const DAYS_PER_WEEK = 7;
