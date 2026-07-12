@@ -332,7 +332,7 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
   }, []);
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 xl:max-w-4xl 2xl:max-w-5xl">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
