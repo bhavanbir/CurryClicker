@@ -8,9 +8,10 @@ import logoUrl from "../../assets/logo_chili.png";
 interface Props {
   screen: Screen;
   onNavigate: (s: Screen) => void;
+  onFeedback: () => void;
 }
 
-export function TopBar({ screen, onNavigate }: Props) {
+export function TopBar({ screen, onNavigate, onFeedback }: Props) {
   const currentCurry = useGameStore((s) => s.currentCurry);
 
   return (
@@ -68,6 +69,14 @@ export function TopBar({ screen, onNavigate }: Props) {
               {formatCurry(currentCurry, 1)}
             </span>
           </div>
+          <button
+            type="button"
+            onClick={onFeedback}
+            aria-label="Send feedback"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border-2 border-ink bg-white text-ink shadow-arcade-sm transition-all hover:-translate-y-0.5"
+          >
+            <Icon name="mail" size={20} />
+          </button>
           <button
             type="button"
             onClick={() => onNavigate("settings")}

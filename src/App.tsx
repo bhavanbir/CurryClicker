@@ -21,6 +21,7 @@ import { ShopNotifier } from "./components/ShopNotifier";
 import { BadgeNotifier } from "./components/BadgeNotifier";
 import { ShopDrawer } from "./components/ShopDrawer";
 import { Onboarding } from "./components/Onboarding";
+import { FeedbackModal } from "./components/FeedbackModal";
 import {
   setSfxEnabled,
   setSfxVolume,
@@ -41,6 +42,7 @@ export default function App() {
   const hasOnboarded = useGameStore((s) => s.hasOnboarded);
   const [screen, setScreen] = useState<Screen>("gameplay");
   const [shopOpen, setShopOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const reduced = useReducedMotion() ?? false;
 
   // The full-page shop and the side drawer are the same catalogue — never
@@ -63,7 +65,11 @@ export default function App() {
 
   return (
     <div className="min-h-[100dvh] w-full">
-      <TopBar screen={visibleScreen} onNavigate={navigate} />
+      <TopBar
+        screen={visibleScreen}
+        onNavigate={navigate}
+        onFeedback={() => setFeedbackOpen(true)}
+      />
 
       <main
         className={`mx-auto w-full max-w-container px-3 pb-28 pt-[72px] transition-[padding] duration-300 sm:px-4 md:pb-8 ${
@@ -110,6 +116,7 @@ export default function App() {
       {!shopOpen && <ShopNotifier onOpenShop={() => setShopOpen(true)} />}
       <BadgeNotifier onOpenProfile={() => setScreen("profile")} />
       {!hasOnboarded && <Onboarding />}
+      {feedbackOpen && <FeedbackModal onClose={() => setFeedbackOpen(false)} />}
     </div>
   );
 }
