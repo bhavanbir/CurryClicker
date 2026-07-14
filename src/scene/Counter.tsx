@@ -1,6 +1,6 @@
 import { Sprite } from "./Sprite";
 import { PIXEL_SCALE, CURRY_VARIANTS } from "./manifest";
-import { SKINS } from "./skins";
+import { BACKDROPS } from "./SceneBackdrop";
 import type { SceneSkin } from "../types";
 
 // The foreground counter, seen from above — the player stands over it looking
@@ -53,20 +53,27 @@ function slot(i: number): Slot {
 
 export function Counter({ count, skin = "default" }: { count: number; skin?: SceneSkin }) {
   const dishes = Math.min(count, COUNTER_CAPACITY);
-  const pal = SKINS[skin];
 
   return (
     <div className="pointer-events-none absolute inset-0">
-      {/* counter surface */}
+      {/* Counter surface — the counter-face slice (rows 135–192) of the same
+          baked backdrop PNG, drawn here on the high-z slab so it sits above
+          diners. Full width to map 1:1 onto the bake's full-width counter.
+          backgroundSize Y: the face is 57 of 192 rows = 29.69% of the image, so
+          100/(57/192) = 336.84% scales that slice to fill the slab; anchored
+          `bottom` so rows 135–192 land at the bottom edge. */}
       <div
         className="absolute"
         style={{
           zIndex: 2000,
           top: `${BACK_Y}%`,
           bottom: `${100 - FRONT_Y}%`,
-          left: `${BACK_L}%`,
-          width: `${BACK_R - BACK_L}%`,
-          background: `linear-gradient(${pal.counterFrom}, ${pal.counterTo})`,
+          left: 0,
+          width: "100%",
+          backgroundImage: `url(${BACKDROPS[skin]})`,
+          backgroundSize: "100% 336.84%",
+          backgroundPosition: "bottom",
+          imageRendering: "pixelated",
           boxShadow: "0 -6px 14px rgba(0, 0, 0, 0.25)",
         }}
       />

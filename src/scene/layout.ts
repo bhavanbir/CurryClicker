@@ -78,10 +78,29 @@ export const PLANTS: { u: number; v: number }[] = [
 
 // Back-wall structure.
 export const DOOR = { u: 0.5, heightPct: 0 };
+// Windows retuned to heightPct 0.55 (sill lower) now they're a 32×32 diorama.
 export const WINDOWS: { u: number; heightPct: number }[] = [
-  { u: 0.18, heightPct: 0.5 },
-  { u: 0.82, heightPct: 0.5 },
+  { u: 0.18, heightPct: 0.55 },
+  { u: 0.82, heightPct: 0.55 },
 ];
+
+// Fixed interior fixtures. Keys index manifest FIXTURE. Wall pieces use
+// (u, heightPct); the entry mat is the one floor fixture (u, v via project).
+export const FIXTURES = [
+  // Ceiling pieces sit lower than the spec's first pass: sprites are
+  // bottom-anchored, so a too-high heightPct pushes the art above the frame.
+  { key: "ceilingFan", u: 0.33, heightPct: 0.6 },
+  { key: "ceilingFan", u: 0.67, heightPct: 0.6 },
+  { key: "pendantLamp", u: 0.44, heightPct: 0.62 },
+  { key: "pendantLamp", u: 0.56, heightPct: 0.62 },
+  { key: "wallClock", u: 0.72, heightPct: 0.65 },
+  { key: "windowValance", u: 0.18, heightPct: 0.72 },
+  { key: "windowValance", u: 0.82, heightPct: 0.72 },
+  { key: "menuBoard", u: 0.33, heightPct: 0.14 },
+  { key: "tumblerShelf", u: 0.67, heightPct: 0.14 },
+  { key: "familyPhotos", u: 0.5, heightPct: 0.2 },
+] as const;
+export const FLOOR_FIXTURES = [{ key: "entryMat", u: 0.5, v: 0.06 }] as const;
 
 // Where the chef stands behind the counter, and where served-dish pops appear.
 export const CHEF_SPOT = { u: 0.5, v: 0.84 };

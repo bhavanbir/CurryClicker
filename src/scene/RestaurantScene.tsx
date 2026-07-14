@@ -6,8 +6,9 @@ import { Customer } from "./Customer";
 import { DecorationLayer } from "./DecorationLayer";
 import { SceneEditor } from "./SceneEditor";
 import { project, projectWall, type Projected } from "./projection";
-import { PIXEL_SCALE, PROP, type SpriteAnim } from "./manifest";
-import { tablesForLevel, PLANTS, DOOR, WINDOWS } from "./layout";
+import { PIXEL_SCALE, PROP, FIXTURE, type SpriteAnim } from "./manifest";
+import { tablesForLevel, PLANTS, DOOR, WINDOWS, FIXTURES, FLOOR_FIXTURES } from "./layout";
+import { WindowView } from "./WindowView";
 import { useCustomerDirector } from "../hooks/useCustomerDirector";
 import { useEffects } from "../hooks/useRecipeScore";
 import { useGameStore } from "../store/useGameStore";
@@ -119,7 +120,15 @@ export function RestaurantScene({
       {/* Back-wall structure */}
       <Placed p={projectWall(DOOR.u, DOOR.heightPct)} anim={PROP.door} />
       {WINDOWS.map((w, i) => (
-        <Placed key={i} p={projectWall(w.u, w.heightPct)} anim={PROP.window} />
+        <WindowView key={i} p={projectWall(w.u, w.heightPct)} />
+      ))}
+
+      {/* Interior fixtures — fixed room dressing, behind diners (wall z=0) */}
+      {FIXTURES.map((f, i) => (
+        <Placed key={i} p={projectWall(f.u, f.heightPct)} anim={FIXTURE[f.key]} />
+      ))}
+      {FLOOR_FIXTURES.map((f, i) => (
+        <Placed key={i} p={project(f.u, f.v)} anim={FIXTURE[f.key]} />
       ))}
 
       {/* Corner plants */}

@@ -249,9 +249,9 @@ One PNG, **uniform 32×32 cells**, 4 columns × 3 rows = **128×96 px**. Uniform
 
 | Prop | Anchor call | xPct | yPct | z-layer |
 | --- | --- | --- | --- | --- |
-| `ceilingFan` ×2 | `projectWall(0.33, 0.90)`, `projectWall(0.67, 0.90)` | 31.8 / 58.2 | 4.0 | z=0, behind customers; flanks the center sign |
-| `pendantLamp` ×2 | `projectWall(0.44, 0.86)`, `projectWall(0.56, 0.86)` | 47.1 / 52.9 | 5.6 | z=0; sign (z2500) overlays cleanly |
-| `wallClock` | `projectWall(0.72, 0.80)` | 60.6 | 8.0 | z=0; sits between right window & center |
+| `ceilingFan` ×2 | `projectWall(0.33, 0.60)`, `projectWall(0.67, 0.60)` | 31.8 / 58.2 | 16.0 | z=0, behind customers; flanks the center sign |
+| `pendantLamp` ×2 | `projectWall(0.44, 0.62)`, `projectWall(0.56, 0.62)` | 47.1 / 52.9 | 15.2 | z=0; sign (z2500) overlays cleanly |
+| `wallClock` | `projectWall(0.72, 0.65)` | 60.6 | 14.0 | z=0; sits between right window & center |
 | `windowValance` ×2 | `projectWall(0.18, 0.72)`, `projectWall(0.82, 0.72)` | 34.6 / 65.4 | 11.2 ‡ | z=0; caps the top of each window (dresses, doesn't cover) |
 | `menuBoard` | `projectWall(0.33, 0.14)` | 31.8 | 34.4 | z=0; below décor row & window bottom |
 | `tumblerShelf` | `projectWall(0.67, 0.14)` | 58.2 | 34.4 | z=0; mirror of the board |
@@ -266,7 +266,7 @@ intended — a ~0.17 `heightPct` offset above the glass. If the window
 pelmet stays flush with the frame's top rail rather than floating or covering
 the glass.
 
-Vertical clearances: décor `WALL_SLOTS` back row is at `yPct≈16` (heightPct≈0.6); every wall fixture is at `yPct≤11` (ceiling/window band) or `yPct≥32` (below-window band). Side-wall slots live at `xPct 4–22 / 78–96`; all fixtures sit `xPct 31–66`. No collision with door/windows/sign.
+Vertical clearances: décor `WALL_SLOTS` back row is at `yPct≈16` (heightPct≈0.6). Sprites are bottom-anchored, so ceiling pieces anchor AT `yPct 14–16` and their art rises into the `yPct 2–15` ceiling band above the décor row (anchoring them higher pushes the art off the top of the frame — learned in wiring); the remaining wall fixtures sit at `yPct≥32` (below-window band). Side-wall slots live at `xPct 4–22 / 78–96`; all fixtures sit `xPct 31–66`. No collision with door/windows/sign.
 
 ### 4. Palette — single skin-neutral set (committed)
 
