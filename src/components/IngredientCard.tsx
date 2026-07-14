@@ -75,11 +75,12 @@ export function IngredientCard({
         className="relative flex aspect-square cursor-not-allowed flex-col items-center justify-center gap-1 rounded-xl border-4 border-dashed border-ink/40 bg-cream-50 p-1.5 opacity-70"
       >
         {flavorPip}
-        <Icon
-          name={ingredient.icon}
-          className={`${ingredient.color} opacity-50 grayscale`}
-          fill
-          size={30}
+        <PixelIcon
+          id={ingredient.id}
+          icon={ingredient.icon}
+          size={32}
+          className="opacity-50 grayscale"
+          iconClassName={ingredient.color}
         />
         <span className="w-full truncate px-0.5 text-center text-[11px] font-bold leading-tight text-ink/50">
           {ingredient.name}

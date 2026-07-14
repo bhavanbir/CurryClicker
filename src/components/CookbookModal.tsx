@@ -3,6 +3,7 @@ import { useGameStore } from "../store/useGameStore";
 import { INGREDIENTS } from "../engine/ingredients";
 import type { DiscoveredRecipe, RecipeTier } from "../types";
 import { Icon } from "./arcade/Icon";
+import { PixelIcon } from "./PixelIcon";
 
 // Cookbook (framework §11.3). Every recipe tried this week, grouped by tier.
 const TIER_META: Record<RecipeTier, { label: string; badge: string }> = {
@@ -148,7 +149,7 @@ function RecipeRow({
               key={id}
               className="flex items-center gap-1 rounded border border-ink/30 bg-cream-50 px-1 py-0.5 text-[10px] font-bold text-ink/70"
             >
-              <Icon name={ing.icon} className={ing.color} fill size={12} />
+              <PixelIcon id={ing.id} icon={ing.icon} size={12} iconClassName={ing.color} />
               {ing.name}
             </span>
           );

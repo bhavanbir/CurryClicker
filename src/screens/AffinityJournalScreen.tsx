@@ -9,6 +9,7 @@ import { TIER_META } from "../components/AffinityBadge";
 import type { Ingredient } from "../types";
 import type { Screen } from "../navigation";
 import { Icon } from "../components/arcade/Icon";
+import { PixelIcon } from "../components/PixelIcon";
 import { PageHeader } from "../components/arcade/PageHeader";
 import { ArcadeButton } from "../components/arcade/ArcadeButton";
 import { ArcadePanel } from "../components/arcade/ArcadePanel";
@@ -192,7 +193,7 @@ function PairIngredient({ ingredient }: { ingredient: Ingredient }) {
   return (
     <div className="flex min-w-0 flex-1 items-center gap-2">
       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border-2 border-ink bg-cream-50">
-        <Icon name={ingredient.icon} fill size={22} className={ingredient.color} />
+        <PixelIcon id={ingredient.id} icon={ingredient.icon} size={22} iconClassName={ingredient.color} />
       </div>
       <span className="truncate text-sm font-bold text-ink">{ingredient.name}</span>
     </div>

@@ -5,6 +5,7 @@ import { INGREDIENTS } from "../engine/ingredients";
 import { suggestRecipeName } from "../engine/cookbook";
 import { AffinityBadge } from "./AffinityBadge";
 import { Icon } from "./arcade/Icon";
+import { PixelIcon } from "./PixelIcon";
 
 // Naming Ceremony (framework §15.2). Fires once when a new great/legendary
 // recipe is first cooked. Accept the suggested name or type your own; skipping
@@ -52,7 +53,7 @@ export function RecipeNamingModal({
                   key={id}
                   className="flex items-center gap-1 rounded border-2 border-ink bg-white px-1.5 py-0.5 text-xs font-bold text-ink"
                 >
-                  <Icon name={ing.icon} className={ing.color} fill size={14} />
+                  <PixelIcon id={ing.id} icon={ing.icon} size={14} iconClassName={ing.color} />
                   {ing.name}
                 </span>
               );
