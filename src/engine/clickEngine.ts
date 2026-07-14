@@ -30,8 +30,8 @@ function countSpices(slots: (string | null)[]): number {
 
 // Cook value pipeline (security_and_logic §1.3, extended with daily special +
 // streak per framework §8/§9):
-//   floor( (base·recipeMult·upgradeMult + decorationFlat + tandoorSpiceBonus)
-//          · streakMult · specialMult )
+//   floor( (base·recipeMult·upgradeMult + flatBonus + tandoorSpiceBonus)
+//          · streakMult · specialMult · decorSetMult )
 export function computeClickValue(
   slots: (string | null)[],
   matrix: AffinityMatrix,
@@ -48,10 +48,11 @@ export function computeClickValue(
 
   return Math.floor(
     (score.baseValue * score.effectiveMultiplier * effects.clickMultiplier +
-      effects.decorationClickBonus +
+      effects.flatClickBonus +
       tandoorBonus) *
       mods.streakMultiplier *
       mods.specialMultiplier *
+      effects.decorSetMultiplier *
       effects.globalMultiplier,
   );
 }

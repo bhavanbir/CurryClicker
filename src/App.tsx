@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useGameLoop } from "./hooks/useGameLoop";
 import { useWeeklySeed } from "./hooks/useWeeklySeed";
-import { useGameStore } from "./store/useGameStore";
+import { useGameStore, useFeatureUnlocked } from "./store/useGameStore";
 import type { Screen } from "./navigation";
 import { TopBar } from "./components/shell/TopBar";
 import { BottomNav } from "./components/shell/BottomNav";
@@ -20,7 +20,9 @@ import { RewardsLayer } from "./components/RewardsLayer";
 import { ShopNotifier } from "./components/ShopNotifier";
 import { BadgeNotifier } from "./components/BadgeNotifier";
 import { ShopDrawer } from "./components/ShopDrawer";
-import { Onboarding } from "./components/Onboarding";
+import { Spotlight } from "./components/Spotlight";
+import { RecipeTutorial } from "./components/RecipeTutorial";
+import { FeatureIntroLayer } from "./components/FeatureIntroLayer";
 import { FeedbackModal } from "./components/FeedbackModal";
 import {
   setSfxEnabled,
@@ -39,7 +41,9 @@ export default function App() {
   const musicOn = useGameStore((s) => s.musicOn);
   const sfxVolume = useGameStore((s) => s.sfxVolume);
   const musicVolume = useGameStore((s) => s.musicVolume);
-  const hasOnboarded = useGameStore((s) => s.hasOnboarded);
+  const tutorialStep = useGameStore((s) => s.tutorialStep);
+  const setTutorialStep = useGameStore((s) => s.setTutorialStep);
+  const dayStarted = useGameStore((s) => s.dayStarted);
   const [screen, setScreen] = useState<Screen>("gameplay");
   const [shopOpen, setShopOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
@@ -49,8 +53,17 @@ export default function App() {
   // show both at once.
   const navigate = (s: Screen) => {
     if (s === "shop") setShopOpen(false);
+    // Tab tour ends where it points: opening the Kitchen starts the day-2
+    // recipe tutorial.
+    if (s === "kitchen" && tutorialStep === "tabs") setTutorialStep("kitchen");
     setScreen(s);
   };
+
+  // Progressive reveal: day 1 is just the restaurant — nav, shop and side
+  // systems stay hidden until the first day is cooked through.
+  const chromeHidden = tutorialStep === "start" || tutorialStep === "cook";
+  // The shop (page, drawer, notifier) joins the guided week on day 3.
+  const shopUnlocked = useFeatureUnlocked("shop");
 
   // Keep the sound engine in sync with the settings.
   useEffect(() => setSfxEnabled(sfxOn), [sfxOn]);
@@ -65,11 +78,13 @@ export default function App() {
 
   return (
     <div className="min-h-[100dvh] w-full">
-      <TopBar
-        screen={visibleScreen}
-        onNavigate={navigate}
-        onFeedback={() => setFeedbackOpen(true)}
-      />
+      {!chromeHidden && (
+        <TopBar
+          screen={visibleScreen}
+          onNavigate={navigate}
+          onFeedback={() => setFeedbackOpen(true)}
+        />
+      )}
 
       <main
         className={`mx-auto w-full max-w-container px-3 pb-28 pt-[72px] transition-[padding] duration-300 sm:px-4 md:pb-8 ${
@@ -102,20 +117,39 @@ export default function App() {
         </AnimatePresence>
       </main>
 
-      <BottomNav screen={visibleScreen} onNavigate={navigate} />
+      {!chromeHidden && <BottomNav screen={visibleScreen} onNavigate={navigate} />}
 
       {phase === "week_summary" && <WeekSummaryModal onNavigate={navigate} />}
       <DayChoiceModal />
       <RewardsLayer />
-      <ShopDrawer
-        open={shopOpen}
-        onOpen={() => setShopOpen(true)}
-        onClose={() => setShopOpen(false)}
-        onNavigate={navigate}
-      />
-      {!shopOpen && <ShopNotifier onOpenShop={() => setShopOpen(true)} />}
+      {shopUnlocked && (
+        <ShopDrawer
+          open={shopOpen}
+          onOpen={() => setShopOpen(true)}
+          onClose={() => setShopOpen(false)}
+          onNavigate={navigate}
+        />
+      )}
+      {shopUnlocked && !shopOpen && (
+        <ShopNotifier onOpenShop={() => setShopOpen(true)} />
+      )}
       <BadgeNotifier onOpenProfile={() => setScreen("profile")} />
-      {!hasOnboarded && <Onboarding />}
+      {tutorialStep === "start" && (
+        <Spotlight
+          target="start-btn"
+          label="👆 Press Start to open your restaurant!"
+        />
+      )}
+      {tutorialStep === "tabs" && !dayStarted && (
+        <Spotlight
+          target="nav-kitchen"
+          label="Day 1 done! Everything's unlocked — open the Kitchen to improve your recipe."
+        />
+      )}
+      {tutorialStep === "kitchen" && visibleScreen === "kitchen" && (
+        <RecipeTutorial onDone={() => setTutorialStep("week1")} />
+      )}
+      <FeatureIntroLayer />
       {feedbackOpen && <FeedbackModal onClose={() => setFeedbackOpen(false)} />}
     </div>
   );

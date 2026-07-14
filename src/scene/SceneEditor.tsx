@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { useGameStore } from "../store/useGameStore";
-import { DECORATIONS } from "../engine/shopData";
-import { WALL_SLOTS } from "./walls";
+import { DECORATIONS, DECOR_SETS, DECORATION_MAP, decorSetComplete } from "../engine/shopData";
 import { SKIN_ORDER, SKINS } from "./skins";
 import { Icon } from "../components/arcade/Icon";
 import { PixelIcon } from "../components/PixelIcon";
 
-// In-scene "Decorate" mode: pick an owned decoration from the tray, then tap a
-// floor cell to drop it (snapped to the grid). Also swaps the restaurant skin.
+// In-scene "Decorate" mode: pick an owned decoration from the tray, then tap
+// anywhere in the room to drop it there (free placement). Completing a themed
+// set pays a permanent cook-value bonus — progress shows in the Sets row.
 // Placed items are removed by tapping them (handled by DecorationLayer).
 
 export function SceneEditor({ onClose }: { onClose: () => void }) {
@@ -23,39 +23,24 @@ export function SceneEditor({ onClose }: { onClose: () => void }) {
     (owned[id] ?? 0) - placements.filter((p) => p.decorationId === id).length;
 
   const ownedDecos = DECORATIONS.filter((d) => (owned[d.id] ?? 0) > 0);
-  const occupied = new Set(placements.map((p) => p.col));
-
-  function placeAt(slotIndex: number) {
-    if (!selected) return;
-    const ok = placeDecoration(selected, slotIndex, 0);
-    if (ok && remainingOf(selected) - 1 <= 0) setSelected(null);
-  }
 
   return (
     <>
-      {/* Free wall slots — only while a decoration is selected. */}
-      {selected &&
-        WALL_SLOTS.map((slot, i) =>
-          occupied.has(i) ? null : (
-            <button
-              key={i}
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                placeAt(i);
-              }}
-              className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-dashed border-ink/50 bg-white/40 hover:border-primary hover:bg-primary/40"
-              style={{
-                left: `${slot.xPct}%`,
-                top: `${slot.yPct}%`,
-                width: Math.round(22 * slot.scale + 8),
-                height: Math.round(22 * slot.scale + 8),
-                zIndex: 3000,
-              }}
-              aria-label={`Place on wall spot ${i + 1}`}
-            />
-          ),
-        )}
+      {/* Free-placement layer — tap anywhere in the scene to drop the pick. */}
+      {selected && (
+        <div
+          className="absolute inset-0 cursor-copy"
+          style={{ zIndex: 3000 }}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            const rect = e.currentTarget.getBoundingClientRect();
+            const xPct = ((e.clientX - rect.left) / rect.width) * 100;
+            const yPct = ((e.clientY - rect.top) / rect.height) * 100;
+            const ok = placeDecoration(selected, xPct, yPct);
+            if (ok && remainingOf(selected) - 1 <= 0) setSelected(null);
+          }}
+        />
+      )}
 
       {/* Bottom control panel. */}
       <div
@@ -65,7 +50,7 @@ export function SceneEditor({ onClose }: { onClose: () => void }) {
       >
         <div className="mb-2 flex items-center justify-between">
           <span className="font-display text-sm font-black uppercase text-ink">
-            {selected ? "Tap a wall spot to place" : "Decorate your shop"}
+            {selected ? "Tap anywhere to place" : "Decorate your shop"}
           </span>
           <button
             type="button"
@@ -106,6 +91,31 @@ export function SceneEditor({ onClose }: { onClose: () => void }) {
             Buy decorations in the Store, then place them here.
           </p>
         )}
+
+        {/* Set bonuses — own every piece of a theme for a permanent boost */}
+        <div className="mt-2 flex items-center gap-2 border-t-2 border-ink/15 pt-2">
+          <span className="text-[10px] font-black uppercase tracking-wide text-ink/55">Sets</span>
+          <div className="flex gap-1.5 overflow-x-auto hide-scrollbar">
+            {DECOR_SETS.map((s) => {
+              const done = decorSetComplete(s, owned);
+              const have = s.pieces.filter((id) => (owned[id] ?? 0) > 0).length;
+              return (
+                <span
+                  key={s.id}
+                  title={`${s.name}: ${s.pieces
+                    .map((id) => DECORATION_MAP[id]?.name ?? id)
+                    .join(" + ")} → ×${s.clickMult} cook value`}
+                  className={`flex h-7 shrink-0 items-center gap-1 rounded-md border-2 border-ink px-1.5 text-[9px] font-black uppercase ${
+                    done ? "bg-buy text-ink" : "bg-white/70 text-ink/60"
+                  }`}
+                >
+                  {done && <Icon name="star" fill size={12} className="text-primary" />}
+                  {s.name} {done ? `×${s.clickMult}` : `${have}/${s.pieces.length}`}
+                </span>
+              );
+            })}
+          </div>
+        </div>
 
         {/* Skin picker */}
         <div className="mt-2 flex items-center gap-2 border-t-2 border-ink/15 pt-2">

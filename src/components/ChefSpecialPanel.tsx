@@ -7,9 +7,10 @@ import { Icon } from "./arcade/Icon";
 import { PixelIcon } from "./PixelIcon";
 
 // Chef's Special as a vertical card attached to the left side of the kitchen
-// frame (mounted inside GameplayScreen's scene wrapper). Starts open and folds
-// into a left edge tab (mirroring the shop handle) at any md+ size. On mobile
-// the special is discoverable from the Kitchen.
+// frame (mounted inside GameplayScreen's scene wrapper). Starts folded into a
+// left edge tab (mirroring the shop handle) at any md+ size so the scene stays
+// calm; the star tab expands it. On mobile the special is discoverable from
+// the Kitchen.
 export function ChefSpecialPanel() {
   const currentDay = useGameStore((s) => s.currentDay);
   const seed = useGameStore((s) => s.seed);
@@ -17,7 +18,7 @@ export function ChefSpecialPanel() {
   const claimDays = useGameStore((s) => s.specialClaimDays);
   const clearRecipe = useGameStore((s) => s.clearRecipe);
   const toggleIngredient = useGameStore((s) => s.toggleIngredient);
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
 
   const special = getDailySpecial(currentDay, seed);
   const a = INGREDIENTS[special.ingredientA];

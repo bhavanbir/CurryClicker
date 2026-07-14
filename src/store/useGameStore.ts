@@ -28,10 +28,14 @@ import {
   TIER_ORDER,
 } from "../engine/recipeEngine";
 import { computeEffects } from "../engine/effects";
-import { computeAutoProduction } from "../engine/autoEngine";
 import { recipeFingerprint } from "../engine/cookbook";
 import { evaluateBadges } from "../engine/badges";
-import { UPGRADE_MAP, DECORATION_MAP, upgradeCost } from "../engine/shopData";
+import {
+  UPGRADE_MAP,
+  DECORATION_MAP,
+  upgradeCost,
+  decorationCost,
+} from "../engine/shopData";
 import {
   FRANCHISE_UPGRADE_MAP,
   headStartCurry,
@@ -39,12 +43,32 @@ import {
   unlockedIngredientIds,
 } from "../engine/franchiseData";
 import { makeRng } from "../lib/rng";
-import { WALL_PLACE_ORDER } from "../scene/walls";
+import { WALL_PLACE_ORDER, WALL_SLOTS } from "../scene/walls";
 import { BASE_UNLOCKED_SLOTS, TASTE_COOKS_TO_REVEAL } from "../config";
 import { IS_DEMO, DEMO_DECORATIONS, DEMO_LOCKED_INGREDIENT_SET } from "../target";
 
 export const SAVE_KEY = "curry-clicker-save";
-export const SAVE_VERSION = 12;
+export const SAVE_VERSION = 14;
+
+// Guided first run, revealed one step at a time:
+//   start   → only the scene + Start button visible (spotlight on Start)
+//   cook    → day 1 runs; just mash — nav and side systems stay hidden
+//   tabs    → day 1 done; nav revealed, spotlight points at the Kitchen tab
+//   kitchen → day-2 recipe/affinity tutorial shown in the Kitchen
+//   week1   → rest of the guided week; features unlock one day at a time
+//   done    → full UI
+export type TutorialStep = "start" | "cook" | "tabs" | "kitchen" | "week1" | "done";
+
+// Guided week: the in-game day each side system joins the game (with a
+// one-time intro card — see FeatureIntroLayer). Veterans skip all gates.
+export const FEATURE_UNLOCK_DAY = { shop: 3, craving: 4, special: 5 } as const;
+export type UnlockFeature = keyof typeof FEATURE_UNLOCK_DAY;
+
+export function useFeatureUnlocked(f: UnlockFeature): boolean {
+  return useGameStore(
+    (s) => s.tutorialStep === "done" || s.currentDay >= FEATURE_UNLOCK_DAY[f],
+  );
+}
 
 // NOTE: MVP keeps a flat store. The framework's slice split
 // (player/recipe/week/shop/cosmetics) is the Phase-2 refactor target.
@@ -80,6 +104,8 @@ export interface GameState {
   musicVolume: number; // 0–1
   darkMode: boolean;
   hasOnboarded: boolean; // first-run tutorial dismissed
+  tutorialStep: TutorialStep; // guided first-run progress (see TutorialStep)
+  introsSeen: string[]; // one-time feature intro cards already dismissed
 
   // --- recipe ---
   slots: (string | null)[];
@@ -123,7 +149,6 @@ export interface GameState {
   dayProgress: number; // 0.0–1.0 within the current day
   dayStarted: boolean; // false until the player presses Start Day — clock paused
   dayPaused: boolean; // mid-day pause; not persisted (a reload lands pre-day anyway)
-  autoProduction: number; // derived: decoration + auto-clicker CPS × recipe mult
   todayCurry: number;
   todayClicks: number;
   dailySnapshots: DailySnapshot[];
@@ -140,7 +165,8 @@ export interface GameState {
     patch: Partial<Pick<GameState, "sfxOn" | "musicOn" | "sfxVolume" | "musicVolume">>,
   ) => void;
   toggleDark: () => void;
-  completeOnboarding: () => void;
+  setTutorialStep: (step: TutorialStep) => void;
+  markIntroSeen: (id: string) => void;
   replayOnboarding: () => void;
   toggleIngredient: (id: string) => void;
   setIngredient: (slot: number, id: string | null) => void;
@@ -172,7 +198,7 @@ export interface GameState {
   refreshBadges: () => void;
 
   // scene
-  placeDecoration: (decorationId: string, col: number, row: number) => boolean;
+  placeDecoration: (decorationId: string, xPct: number, yPct: number) => boolean;
   removePlacement: (instanceId: string) => void;
   setActiveSkin: (skin: SceneSkin) => void;
 }
@@ -223,13 +249,17 @@ function currentTier(s: GameState): RecipeTier {
   }).tier;
 }
 
-// Next free wall slot for auto-placing a bought decoration (col = slot index).
-function nextFreeCell(placements: Placement[]): { col: number; row: number } | null {
-  const used = new Set(placements.map((p) => p.col));
+// Default drop spot for a just-bought decoration: the first wall anchor with
+// nothing already sitting on it (players can move it anywhere afterwards).
+function nextFreeSpot(placements: Placement[]): { xPct: number; yPct: number } {
   for (const i of WALL_PLACE_ORDER) {
-    if (!used.has(i)) return { col: i, row: 0 };
+    const slot = WALL_SLOTS[i];
+    const taken = placements.some(
+      (p) => Math.abs(p.xPct - slot.xPct) < 3 && Math.abs(p.yPct - slot.yPct) < 3,
+    );
+    if (!taken) return { xPct: slot.xPct, yPct: slot.yPct };
   }
-  return null;
+  return { xPct: 50, yPct: 40 }; // walls full — drop mid-room
 }
 
 export const useGameStore = create<GameState>()(
@@ -251,6 +281,8 @@ export const useGameStore = create<GameState>()(
       musicVolume: 0.7,
       darkMode: false,
       hasOnboarded: false,
+      tutorialStep: "start",
+      introsSeen: [],
 
       slots: [...EMPTY_SLOTS],
 
@@ -286,7 +318,6 @@ export const useGameStore = create<GameState>()(
       dayProgress: 0,
       dayStarted: false,
       dayPaused: false,
-      autoProduction: 0,
       todayCurry: 0,
       todayClicks: 0,
       dailySnapshots: [],
@@ -318,21 +349,15 @@ export const useGameStore = create<GameState>()(
 
       toggleDark: () => set((s) => ({ darkMode: !s.darkMode })),
 
-      completeOnboarding: () => {
-        // Starter recipe: a fresh player lands with something cookable so the
-        // first tap works without a Kitchen detour.
-        const s = get();
-        if (s.slots.every((x) => x === null)) {
-          const ids = unlockedIngredientIds(s.franchiseUpgrades).filter(
-            (id) => !IS_DEMO || !DEMO_LOCKED_INGREDIENT_SET.has(id),
-          );
-          const { matrix } = getAffinityData(s.seed);
-          get().setRecipe(randomNeutralRecipe(ids, s.unlockedSlots, matrix));
-        }
-        set({ hasOnboarded: true });
-      },
+      setTutorialStep: (step) => set({ tutorialStep: step }),
 
-      replayOnboarding: () => set({ hasOnboarded: false }),
+      markIntroSeen: (id) =>
+        set((s) =>
+          s.introsSeen.includes(id) ? {} : { introsSeen: [...s.introsSeen, id] },
+        ),
+
+      replayOnboarding: () =>
+        set({ hasOnboarded: false, tutorialStep: "start", introsSeen: [] }),
 
       toggleIngredient: (id) => {
         set((s) => {
@@ -399,6 +424,7 @@ export const useGameStore = create<GameState>()(
           let lastWeekStars = s.lastWeekStars;
           let pendingDayChoices = s.pendingDayChoices;
           let activeDayModifierId = s.activeDayModifierId;
+          let tutorialStep = s.tutorialStep;
 
           const tierAtDayEnd = currentTier(s);
 
@@ -482,11 +508,22 @@ export const useGameStore = create<GameState>()(
               franchiseStars += total;
               franchiseStarsEarned += total;
               lastWeekStars = { total, reasons };
+
+              // Demo has no prestige loop to explain — the guided week ends
+              // here (full game shows the prestige intro instead).
+              if (IS_DEMO && tutorialStep !== "done") tutorialStep = "done";
             } else {
               dayProgress = 0; // hold at the start of the next day
               // Modifiers picked earlier this week don't come back around.
               const ids = pickDayChoiceIds(s.seed, currentDay, s.usedDayModifierIds);
               pendingDayChoices = ids.length > 0 ? ids : null;
+            }
+
+            // Tutorial: the first day ending flows into the tab tour — skip
+            // the day-choice offer so the nav spotlight isn't buried.
+            if (tutorialStep === "cook") {
+              tutorialStep = "tabs";
+              pendingDayChoices = null;
             }
           }
 
@@ -501,6 +538,7 @@ export const useGameStore = create<GameState>()(
             todayClicks,
             pendingDayChoices,
             activeDayModifierId,
+            tutorialStep,
             recipeStreakDays: streakDays,
             recipeStreakMultiplier: streakMult,
             weeksCompleted,
@@ -512,14 +550,28 @@ export const useGameStore = create<GameState>()(
           };
         }),
 
-      startDay: () =>
-        set((s) =>
-          s.phase === "cooking" &&
-          !s.dayStarted &&
-          !(IS_DEMO && s.weeksCompleted >= 1)
-            ? { dayStarted: true, dayPaused: false }
-            : {},
-        ),
+      startDay: () => {
+        const s = get();
+        if (
+          s.phase !== "cooking" ||
+          s.dayStarted ||
+          (IS_DEMO && s.weeksCompleted >= 1)
+        )
+          return;
+        if (s.tutorialStep === "start") {
+          // First run: drop in a starter recipe so the very first tap already
+          // cooks — no Kitchen detour before the first win.
+          if (s.slots.every((x) => x === null)) {
+            const ids = unlockedIngredientIds(s.franchiseUpgrades).filter(
+              (id) => !IS_DEMO || !DEMO_LOCKED_INGREDIENT_SET.has(id),
+            );
+            const { matrix } = getAffinityData(s.seed);
+            get().setRecipe(randomNeutralRecipe(ids, s.unlockedSlots, matrix));
+          }
+          set({ hasOnboarded: true, tutorialStep: "cook" });
+        }
+        set({ dayStarted: true, dayPaused: false });
+      },
 
       togglePause: () =>
         set((s) => (s.dayStarted ? { dayPaused: !s.dayPaused } : {})),
@@ -598,15 +650,17 @@ export const useGameStore = create<GameState>()(
           dayStarted: false,
           dayPaused: false,
           // Prestige: upgrades reset each week (re-buy at scaled prices with
-          // stronger ladles); decorations persist.
+          // stronger ladles); decorations persist. The score starts over from
+          // zero (plus any franchise Head Start) — no bankroll carryover.
           purchasedUpgrades: [],
-          currentCurry: s.currentCurry + headStart,
+          currentCurry: headStart,
           weekCurry: 0,
           todayCurry: 0,
           todayClicks: 0,
           clicksThisWeek: 0,
           dailySnapshots: [],
-          // weekly reward state resets; the matrix is new so recipes differ
+          // weekly reward state resets (the affinity matrix itself only
+          // reshuffles with the real calendar date — see ensureCurrentDate)
           specialClaimDays: [],
           recipeStreakDays: 0,
           recipeStreakMultiplier: 1,
@@ -637,6 +691,8 @@ export const useGameStore = create<GameState>()(
           dailyCurry: 0,
           trophies: {},
           hasOnboarded: true, // already a returning player; don't replay tutorial
+          tutorialStep: "done",
+          introsSeen: [],
           slots: [...EMPTY_SLOTS],
           ownedDecorations: {},
           purchasedUpgrades: [],
@@ -666,7 +722,6 @@ export const useGameStore = create<GameState>()(
           dayProgress: 0,
           dayStarted: false,
           dayPaused: false,
-          autoProduction: 0,
           todayCurry: 0,
           todayClicks: 0,
           dailySnapshots: [],
@@ -709,24 +764,23 @@ export const useGameStore = create<GameState>()(
         if (IS_DEMO && !DEMO_DECORATIONS.includes(id)) return false;
         const owned = s.ownedDecorations[id] ?? 0;
         if (owned >= deco.maxQuantity) return false;
-        const cost = deco.cost;
+        // Repeat copies cost more — prices keep pace with the bankroll.
+        const cost = decorationCost(deco, owned);
         if (s.currentCurry < cost) return false;
 
         set((st) => ({
           currentCurry: st.currentCurry - cost,
           ownedDecorations: { ...st.ownedDecorations, [id]: owned + 1 },
         }));
-        // Auto-place it so the purchase immediately shows up in the shop. The
-        // player can still reposition/remove it in the scene's Decorate mode.
-        const cell = nextFreeCell(get().decorationPlacements);
-        if (cell) {
-          set((st) => ({
-            decorationPlacements: [
-              ...st.decorationPlacements,
-              { instanceId: `${id}-${crypto.randomUUID()}`, decorationId: id, col: cell.col, row: cell.row },
-            ],
-          }));
-        }
+        // Auto-place it so the purchase immediately shows up in the scene. The
+        // player can still move it anywhere in Decorate mode.
+        const spot = nextFreeSpot(get().decorationPlacements);
+        set((st) => ({
+          decorationPlacements: [
+            ...st.decorationPlacements,
+            { instanceId: `${id}-${crypto.randomUUID()}`, decorationId: id, ...spot },
+          ],
+        }));
         get().recomputeDerived();
         return true;
       },
@@ -755,7 +809,7 @@ export const useGameStore = create<GameState>()(
         return true;
       },
 
-      placeDecoration: (decorationId, col, row) => {
+      placeDecoration: (decorationId, xPct, yPct) => {
         const s = get();
         const owned = s.ownedDecorations[decorationId] ?? 0;
         if (owned <= 0) return false;
@@ -769,7 +823,13 @@ export const useGameStore = create<GameState>()(
         set((st) => ({
           decorationPlacements: [
             ...st.decorationPlacements,
-            { instanceId, decorationId, col, row },
+            {
+              instanceId,
+              decorationId,
+              // Keep drops inside the room, off the foreground counter.
+              xPct: Math.min(97, Math.max(3, xPct)),
+              yPct: Math.min(70, Math.max(10, yPct)),
+            },
           ],
         }));
         return true;
@@ -792,11 +852,7 @@ export const useGameStore = create<GameState>()(
             s.franchiseUpgrades,
             s.weeksCompleted,
           );
-          const { matrix } = getAffinityData(s.seed);
-          return {
-            unlockedSlots: eff.unlockedSlots,
-            autoProduction: computeAutoProduction(s.slots, matrix, eff),
-          };
+          return { unlockedSlots: eff.unlockedSlots };
         }),
 
       // --- rewards ---
@@ -945,6 +1001,13 @@ export const useGameStore = create<GameState>()(
       // decorations onto the back/side wall slots.
       migrate: (persisted, version) => {
         const p = (persisted ?? {}) as Record<string, unknown>;
+        // Pre-v13 placements addressed WALL_SLOTS by `col` index.
+        type LegacyPlacement = { instanceId: string; decorationId: string; col: number };
+        const nextFreeCol = (placements: LegacyPlacement[]): number | null => {
+          const used = new Set(placements.map((pl) => pl.col));
+          for (const i of WALL_PLACE_ORDER) if (!used.has(i)) return i;
+          return null;
+        };
         if (version < 3) {
           p.decorationPlacements = p.decorationPlacements ?? [];
           p.activeSkin = p.activeSkin ?? "default";
@@ -954,17 +1017,16 @@ export const useGameStore = create<GameState>()(
         }
         if (version < 5) {
           const owned = (p.ownedDecorations as Record<string, number>) ?? {};
-          const placements = [...((p.decorationPlacements as Placement[]) ?? [])];
+          const placements = [...((p.decorationPlacements as LegacyPlacement[]) ?? [])];
           for (const [decoId, qty] of Object.entries(owned)) {
             const have = placements.filter((pl) => pl.decorationId === decoId).length;
             for (let i = have; i < qty; i++) {
-              const cell = nextFreeCell(placements);
-              if (!cell) break;
+              const col = nextFreeCol(placements);
+              if (col === null) break;
               placements.push({
                 instanceId: `${decoId}-mig-${i}`,
                 decorationId: decoId,
-                col: cell.col,
-                row: cell.row,
+                col,
               });
             }
           }
@@ -972,11 +1034,11 @@ export const useGameStore = create<GameState>()(
         }
         if (version < 7) {
           // Re-home decorations onto the back/side wall slots.
-          const repacked: Placement[] = [];
-          for (const pl of (p.decorationPlacements as Placement[]) ?? []) {
-            const cell = nextFreeCell(repacked);
-            if (!cell) break;
-            repacked.push({ ...pl, col: cell.col, row: cell.row });
+          const repacked: LegacyPlacement[] = [];
+          for (const pl of (p.decorationPlacements as LegacyPlacement[]) ?? []) {
+            const col = nextFreeCol(repacked);
+            if (col === null) break;
+            repacked.push({ ...pl, col });
           }
           p.decorationPlacements = repacked;
         }
@@ -1019,6 +1081,28 @@ export const useGameStore = create<GameState>()(
           // old lifetime total so existing players don't open to 0.
           p.bestFranchiseStars = p.bestFranchiseStars ?? p.franchiseStarsEarned ?? 0;
         }
+        if (version < 13) {
+          // Free decoration placement: wall-slot indices become x/y percents.
+          // Auto-production is gone; its derived field goes with it.
+          delete p.autoProduction;
+          p.decorationPlacements = (
+            (p.decorationPlacements as (LegacyPlacement & Partial<Placement>)[]) ?? []
+          ).map((pl) => {
+            if (pl.xPct !== undefined && pl.yPct !== undefined) return pl;
+            const slot = WALL_SLOTS[pl.col] ?? WALL_SLOTS[0];
+            return {
+              instanceId: pl.instanceId,
+              decorationId: pl.decorationId,
+              xPct: slot.xPct,
+              yPct: slot.yPct,
+            };
+          });
+        }
+        if (version < 14) {
+          // Guided first run split into steps; anyone past the old welcome
+          // modal has seen it all.
+          p.tutorialStep = (p.hasOnboarded ?? true) ? "done" : "start";
+        }
         return p as unknown as GameState;
       },
       partialize: (s) => ({
@@ -1027,7 +1111,6 @@ export const useGameStore = create<GameState>()(
         weekCurry: s.weekCurry,
         highScore: s.highScore,
         todayCurry: s.todayCurry,
-        autoProduction: s.autoProduction,
         clicksThisWeek: s.clicksThisWeek,
         sfxOn: s.sfxOn,
         musicOn: s.musicOn,
@@ -1035,6 +1118,8 @@ export const useGameStore = create<GameState>()(
         musicVolume: s.musicVolume,
         darkMode: s.darkMode,
         hasOnboarded: s.hasOnboarded,
+        tutorialStep: s.tutorialStep,
+        introsSeen: s.introsSeen,
         todayClicks: s.todayClicks,
         slots: s.slots,
         ownedDecorations: s.ownedDecorations,
@@ -1084,7 +1169,6 @@ export const useGameStore = create<GameState>()(
           highScore: num(p.highScore),
           todayCurry: num(p.todayCurry),
           dailyCurry: num(p.dailyCurry),
-          autoProduction: num(p.autoProduction),
           dailySnapshots: ((p.dailySnapshots as DailySnapshot[]) ?? []).map(
             (snap) => ({ ...snap, curry: Number(snap.curry) }),
           ),

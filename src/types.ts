@@ -85,7 +85,7 @@ export interface DailySnapshot {
 
 export type UpgradeEffect =
   | { type: "click_multiplier"; value: number }
-  | { type: "auto_cps"; value: number }
+  | { type: "click_flat"; value: number } // flat +curry added to every cook
   | { type: "recipe_slot_unlock"; slotIndex: number } // unlock slots 4 & 5
   | { type: "restaurant_expansion"; level: number }; // 1–5: bigger room, more diners
 
@@ -107,9 +107,8 @@ export interface Decoration {
   icon: string;
   tone: string;
   description: string;
-  cost: number; // in curry
-  passiveCurryPerSec: number;
-  passiveClickBonus: number;
+  cost: number; // in curry (base; repeat copies cost more — see decorationCost)
+  passiveClickBonus: number; // flat +curry added to every cook
   spicePairAffinity?: number; // flat affinity added to every spice/spice pair
   spiceClickBonus?: number; // flat cook value per spice ingredient in recipe
   maxQuantity: number; // stackable up to this many
@@ -140,12 +139,12 @@ export interface DiscoveredRecipe {
 // the IAP skin store is a later phase.
 export type SceneSkin = "default" | "neon" | "zen" | "mumbai";
 
-// A decoration the player has placed onto a floor grid cell in the scene.
+// A decoration the player has placed anywhere in the scene (free placement).
 export interface Placement {
   instanceId: string; // unique per placed instance
   decorationId: string; // -> DECORATION_MAP
-  col: number; // floor grid column (0..GRID_COLS-1)
-  row: number; // floor grid row (0..GRID_ROWS-1)
+  xPct: number; // 0–100, % of scene width
+  yPct: number; // 0–100, % of scene height (also drives depth scale)
 }
 
 // --- Franchise (prestige) ---

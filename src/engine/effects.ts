@@ -4,6 +4,8 @@
 import {
   UPGRADE_MAP,
   DECORATION_MAP,
+  DECOR_SETS,
+  decorSetComplete,
   prestigeBaseClick,
   ladleValue,
 } from "./shopData";
@@ -15,9 +17,8 @@ const SLOT_CAP = IS_DEMO ? DEMO_MAX_SLOTS : MAX_SLOTS;
 
 export interface ActiveEffects {
   clickMultiplier: number; // product of click_multiplier upgrades
-  decorationClickBonus: number; // sum of passiveClickBonus * qty
-  decorationCPS: number; // sum of passiveCurryPerSec * qty
-  autoCPS: number; // sum of auto_cps upgrades
+  flatClickBonus: number; // click_flat upgrades + decoration passiveClickBonus
+  decorSetMultiplier: number; // product of completed decoration-set bonuses
   unlockedSlots: number; // base + recipe_slot_unlock upgrades
   spicePairAffinityBonus: number; // flat affinity added to spice/spice pairs
   spiceClickBonusPerSpice: number; // flat cook value per spice ingredient
@@ -32,7 +33,7 @@ export function computeEffects(
   prestigeLevel = 0,
 ): ActiveEffects {
   let clickMultiplier = prestigeBaseClick(prestigeLevel);
-  let autoCPS = 0;
+  let flatClickBonus = 0;
   let unlockedSlots = franchiseBaseSlots(franchiseUpgrades);
   let expansionLevel = 0;
 
@@ -43,8 +44,8 @@ export function computeEffects(
       case "click_multiplier":
         clickMultiplier *= ladleValue(UPGRADE_MAP[id], prestigeLevel);
         break;
-      case "auto_cps":
-        autoCPS += eff.value;
+      case "click_flat":
+        flatClickBonus += eff.value;
         break;
       case "recipe_slot_unlock":
         unlockedSlots = Math.max(unlockedSlots, eff.slotIndex + 1);
@@ -55,8 +56,6 @@ export function computeEffects(
     }
   }
 
-  let decorationClickBonus = 0;
-  let decorationCPS = 0;
   let spicePairAffinityBonus = 0;
   let spiceClickBonusPerSpice = 0;
 
@@ -65,17 +64,20 @@ export function computeEffects(
     if (!deco) continue;
     const qty = Math.min(qtyRaw, deco.maxQuantity);
     if (qty <= 0) continue;
-    decorationCPS += deco.passiveCurryPerSec * qty;
-    decorationClickBonus += deco.passiveClickBonus * qty;
+    flatClickBonus += deco.passiveClickBonus * qty;
     spicePairAffinityBonus += (deco.spicePairAffinity ?? 0) * qty;
     spiceClickBonusPerSpice += (deco.spiceClickBonus ?? 0) * qty;
   }
 
+  let decorSetMultiplier = 1;
+  for (const set of DECOR_SETS) {
+    if (decorSetComplete(set, ownedDecorations)) decorSetMultiplier *= set.clickMult;
+  }
+
   return {
     clickMultiplier,
-    decorationClickBonus,
-    decorationCPS,
-    autoCPS,
+    flatClickBonus,
+    decorSetMultiplier,
     unlockedSlots: Math.min(unlockedSlots, SLOT_CAP),
     spicePairAffinityBonus,
     spiceClickBonusPerSpice,
@@ -86,9 +88,8 @@ export function computeEffects(
 
 export const NO_EFFECTS: ActiveEffects = {
   clickMultiplier: 1,
-  decorationClickBonus: 0,
-  decorationCPS: 0,
-  autoCPS: 0,
+  flatClickBonus: 0,
+  decorSetMultiplier: 1,
   unlockedSlots: BASE_UNLOCKED_SLOTS,
   spicePairAffinityBonus: 0,
   spiceClickBonusPerSpice: 0,

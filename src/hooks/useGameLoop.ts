@@ -19,16 +19,12 @@ export function useGameLoop() {
 
       const s = useGameStore.getState();
       // Time only flows once the player has opened the day (Start Day) and
-      // isn't paused. Auto-production also stops, so nothing ticks.
+      // isn't paused.
       if (s.phase === "cooking" && s.dayStarted && !s.dayPaused) {
-        // End-of-day modifier can scale auto-production and the day's length.
+        // End-of-day modifier can change the day's length.
         const mod = s.activeDayModifierId
           ? DAY_CHOICE_MAP[s.activeDayModifierId]
           : undefined;
-        const auto = s.autoProduction * (mod?.autoMult ?? 1);
-        if (auto > 0) {
-          s.addCurry(auto * deltaSec);
-        }
         const daySeconds =
           mod?.daySeconds ?? DAY_DURATION_SECONDS * (mod?.dayLengthMult ?? 1);
         s.advanceDayProgress(deltaSec / daySeconds);

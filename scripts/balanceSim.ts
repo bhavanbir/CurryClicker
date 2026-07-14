@@ -23,9 +23,8 @@
 // - Shop buying strategy: CHEAPEST-FIRST among unlocked (prereq-satisfied,
 //   under maxQuantity) items, evaluated at each day end, repeat while
 //   affordable. Franchise buying: cheapest-first at week end.
-// - Income model: one recipe per day; day income = clickValue * clicksPerDay
-//   + autoProduction * dayDuration, with special/streak/craving/reputation
-//   mods exactly as in clickEngine/autoEngine.
+// - Income model: one recipe per day; day income = clickValue * clicksPerDay,
+//   with special/streak/craving/reputation mods exactly as in clickEngine.
 
 import { register } from "node:module";
 
@@ -39,7 +38,6 @@ async function importEngine() {
     affinity,
     recipe,
     click,
-    auto,
     effectsMod,
     week,
     franchise,
@@ -51,7 +49,6 @@ async function importEngine() {
     import("../src/engine/affinityEngine"),
     import("../src/engine/recipeEngine"),
     import("../src/engine/clickEngine"),
-    import("../src/engine/autoEngine"),
     import("../src/engine/effects"),
     import("../src/engine/weekEngine"),
     import("../src/engine/franchiseData"),
@@ -64,7 +61,6 @@ async function importEngine() {
     affinity,
     recipe,
     click,
-    auto,
     effectsMod,
     week,
     franchise,
@@ -97,7 +93,6 @@ const { DAY_DURATION_SECONDS, DAYS_PER_WEEK } = E.config;
 const { getAffinityData, affinityPairKey } = E.affinity;
 const { computeRecipeScore, computeRecipeFlavor } = E.recipe;
 const { computeClickValue } = E.click;
-const { computeAutoProduction } = E.auto;
 const { computeEffects } = E.effectsMod;
 const { getDailySpecial, getDailyCraving, evaluateStreak, streakMultiplierFor } =
   E.week;
@@ -107,7 +102,7 @@ const {
   headStartCurry,
   unlockedIngredientIds,
 } = E.franchise;
-const { UPGRADES, DECORATIONS } = E.shop;
+const { UPGRADES, DECORATIONS, decorationCost } = E.shop;
 const { INGREDIENTS } = E.ingredients;
 const { makeRng } = E.rng;
 
@@ -404,8 +399,9 @@ function buyShopGreedy(p: PlayerState): ShopBuy[] {
       options.push({ id: u.id, cost: u.cost });
     }
     for (const d of DECORATIONS) {
-      if ((p.ownedDecorations[d.id] ?? 0) >= d.maxQuantity) continue;
-      options.push({ id: d.id, cost: d.cost });
+      const qty = p.ownedDecorations[d.id] ?? 0;
+      if (qty >= d.maxQuantity) continue;
+      options.push({ id: d.id, cost: decorationCost(d, qty) });
     }
     options.sort((a, b) => a.cost - b.cost);
     const pick = options.find((o) => p.curry >= o.cost);
@@ -567,9 +563,8 @@ function simulateWeek(
       streakMultiplier: p.streakMult,
       craving: craving as never,
     });
-    const auto = computeAutoProduction(slots, matrix, effects);
     const clicksPerDay = Math.round(arch.clicksPerSec * DAY_DURATION_SECONDS);
-    const dayIncome = clickValue * clicksPerDay + auto * DAY_DURATION_SECONDS;
+    const dayIncome = clickValue * clicksPerDay;
 
     p.curry += dayIncome;
     weekCurry += dayIncome;

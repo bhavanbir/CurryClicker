@@ -12,9 +12,9 @@ const MAX_GAP_MS = 90_000;
 const EVENT_MS = 8_000;
 const CPS_WINDOW_MS = 2_000; // rolling window for the click-rate estimate
 const TIERS = [
-  { floor: 3, mult: 2 },
-  { floor: 5, mult: 3 },
-  { floor: 8, mult: 5 },
+  { floor: 3, mult: 1.5 },
+  { floor: 5, mult: 2 },
+  { floor: 8, mult: 3 },
 ];
 
 export interface CrazyCurryEvent {

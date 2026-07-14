@@ -89,6 +89,20 @@ export function playCook(intensity = 0): void {
   });
 }
 
+/** Rising zap when a crit circle is hit — more steps for bigger multipliers. */
+export function playCrit(mult: number): void {
+  const steps = mult >= 25 ? 4 : mult >= 5 ? 3 : 2;
+  chord(
+    Array.from({ length: steps }, (_, i) => ({
+      freq: 660 * Math.pow(1.25, i),
+      dur: 0.09,
+      type: "square" as OscillatorType,
+      gain: 0.05,
+      delay: i * 0.05,
+    })),
+  );
+}
+
 /** Two-note "ka-ching" on a successful purchase. */
 export function playPurchase(): void {
   chord([

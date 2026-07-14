@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { useGameStore } from "../store/useGameStore";
+import { useGameStore, useFeatureUnlocked } from "../store/useGameStore";
 import { useRecipeScore, useEffects } from "../hooks/useRecipeScore";
 import { getAffinityData, affinityPairKey } from "../engine/affinityEngine";
 import { recipeFingerprint } from "../engine/cookbook";
@@ -10,7 +10,7 @@ import { getDailySpecial, getDailyCraving } from "../engine/weekEngine";
 import { DAY_CHOICE_MAP } from "../engine/dayChoices";
 import { INGREDIENTS } from "../engine/ingredients";
 import { formatCurry } from "../lib/format";
-import { playCook } from "../lib/sfx";
+import { playCook, playCrit, playDiscovery } from "../lib/sfx";
 import type { Screen } from "../navigation";
 import { ScoreDisplay } from "../components/ScoreDisplay";
 import { DayProgressBar } from "../components/DayProgressBar";
@@ -33,7 +33,7 @@ import { SteamCta } from "../components/SteamCta";
 import { FeedbackModal } from "../components/FeedbackModal";
 import { useCrazyCurry } from "../hooks/useCrazyCurry";
 import { useOnFire } from "../hooks/useOnFire";
-import { UPGRADES, DECORATIONS, upgradeCost } from "../engine/shopData";
+import { UPGRADES, DECORATIONS, upgradeCost, decorationCost } from "../engine/shopData";
 
 interface Props {
   onNavigate: (s: Screen) => void;
@@ -73,6 +73,22 @@ function rollCritTier(biasLow = false): CritTier {
 
 const CHAIN_CAP = 3; // max jackpot-chain depth after the first crit click
 
+// Spam-click rewards: escalating shout-outs at daily click milestones keep a
+// mash streak feeling like it's constantly unlocking something new.
+const CLICK_MILESTONES: {
+  at: number;
+  label: string;
+  sfx: "good" | "great" | "legendary";
+  power: 1 | 2;
+}[] = [
+  { at: 15, label: "COMBO ×15!", sfx: "good", power: 1 },
+  { at: 40, label: "HEATING UP! ×40", sfx: "good", power: 1 },
+  { at: 100, label: "CURRY FRENZY! ×100", sfx: "great", power: 2 },
+  { at: 250, label: "UNSTOPPABLE! ×250", sfx: "great", power: 2 },
+  { at: 500, label: "LADLE LEGEND! ×500", sfx: "legendary", power: 2 },
+  { at: 1000, label: "SPICE GOD! ×1000", sfx: "legendary", power: 2 },
+];
+
 export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
   const slots = useGameStore((s) => s.slots);
   const seed = useGameStore((s) => s.seed);
@@ -97,6 +113,13 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
   const franchiseStarsEarned = useGameStore((s) => s.franchiseStarsEarned);
   const activeDayModifierId = useGameStore((s) => s.activeDayModifierId);
   const todayClicks = useGameStore((s) => s.todayClicks);
+  const tutorialStep = useGameStore((s) => s.tutorialStep);
+  // Guided first run: day 1 shows only the core loop; side systems then
+  // unlock one in-game day at a time (FEATURE_UNLOCK_DAY).
+  const tutorialStart = tutorialStep === "start";
+  const shopUnlocked = useFeatureUnlocked("shop");
+  const cravingUnlocked = useFeatureUnlocked("craving");
+  const specialUnlocked = useFeatureUnlocked("special");
   const dayMod = activeDayModifierId ? DAY_CHOICE_MAP[activeDayModifierId] : undefined;
 
   const demoEnded = IS_DEMO && weeksCompleted >= 1;
@@ -169,6 +192,21 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
     addCurry(value);
     registerClick();
     playCook(onFire.heat / 100);
+
+    const milestone = CLICK_MILESTONES.find((m) => m.at === todayClicks + 1);
+    if (milestone) {
+      playDiscovery(milestone.sfx);
+      if (milestone.power === 2) shakeScene("sm");
+      const mid = floatId++;
+      setFloats((f) =>
+        [...f, { id: mid, x, y: y - 56, label: `🏆 ${milestone.label}`, power: milestone.power }].slice(-12),
+      );
+      window.setTimeout(
+        () => setFloats((f) => f.filter((fl) => fl.id !== mid)),
+        1100,
+      );
+    }
+
     if (result.isSpecial) claimSpecial(currentDay);
     const outcome = logCook(slots);
     if (outcome.needsNaming) setNamingFp(outcome.fingerprint);
@@ -198,8 +236,14 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
     else if (crazyMult > 1) label += ` ×${crazyMult}!`;
     else if (result.isSpecial) label += " ×2!";
     else if (fireMult > 1) label += ` 🔥×${fireMult}`;
-    setFloats((f) => [...f, { id, x, y, label }].slice(-12)); // cap under mash
-    window.setTimeout(() => setFloats((f) => f.filter((fl) => fl.id !== id)), 800);
+    // Feedback scales with importance: jackpots > crits/crazy > routine cooks.
+    const power: 0 | 1 | 2 =
+      critMult >= 25 ? 2 : critMult > 1 || crazyMult > 1 ? 1 : 0;
+    setFloats((f) => [...f, { id, x, y, label, power }].slice(-12)); // cap under mash
+    window.setTimeout(
+      () => setFloats((f) => f.filter((fl) => fl.id !== id)),
+      power === 2 ? 1100 : 800,
+    );
   }
 
   function cookFromButton() {
@@ -217,6 +261,16 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
     el.classList.remove("shake-sm", "shake-lg");
     void el.offsetWidth; // reflow so re-adding restarts the animation
     el.classList.add(`shake-${strength}`);
+  }
+
+  // Full-scene warm flash — jackpot crits only, the rarest moment we have.
+  const flashRef = useRef<HTMLDivElement>(null);
+  function flashScene() {
+    const el = flashRef.current;
+    if (!el || reduced) return;
+    el.classList.remove("scene-flash");
+    void el.offsetWidth;
+    el.classList.add("scene-flash");
   }
 
   // On Fire ignition (stage 2) gets a small shake.
@@ -287,7 +341,9 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
     setCrit(null);
     critHoverRef.current = false;
     cook(c.x, c.y, c.tier.mult);
+    playCrit(c.tier.mult);
     if (c.tier.mult >= 5) shakeScene(c.tier.mult >= 25 ? "lg" : "sm");
+    if (c.tier.mult >= 25) flashScene();
     // Jackpot chain: chance to spawn a rarer, one-tier-higher follow-up.
     // Odds shrink per step (35% → 25% → 15%), capped at CHAIN_CAP deep.
     const idx = CRIT_TIERS.indexOf(c.tier);
@@ -334,6 +390,7 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 xl:max-w-4xl 2xl:max-w-5xl">
       {/* Header */}
+      {!tutorialStart && (
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <StatChip icon="calendar_today" label="Day" value={`${currentDay}/7`} />
@@ -357,12 +414,13 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
           <div className="w-[88px]" />
         )}
       </div>
+      )}
 
-      <DayProgressBar />
+      {!tutorialStart && <DayProgressBar />}
 
       {/* Restaurant scene + floats */}
       <div ref={sceneWrapRef} className="relative">
-        <ChefSpecialPanel />
+        {specialUnlocked && <ChefSpecialPanel />}
         <RestaurantScene
           cookSignal={cookSignal}
           onCook={cook}
@@ -392,11 +450,18 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
         <AnimatePresence>
           {floats.map((f) => (
             <div key={f.id}>
-              <ClickBurst x={f.x} y={f.y} />
-              <FloatText x={f.x} y={f.y} label={f.label} />
+              <ClickBurst x={f.x} y={f.y} power={f.power} tint={f.id} />
+              <FloatText x={f.x} y={f.y} label={f.label} power={f.power} />
             </div>
           ))}
         </AnimatePresence>
+
+        {/* Jackpot flash overlay — driven by flashScene(), rests at opacity 0 */}
+        <div
+          ref={flashRef}
+          className="pointer-events-none absolute inset-0 z-40 rounded-xl opacity-0"
+          style={{ backgroundColor: "#fff3d6" }}
+        />
 
         {/* Critical circle — click (or hover + spacebar) before it expires.
             Telegraph phase = non-interactive "incoming" cue for chained circles. */}
@@ -505,8 +570,8 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
             </h2>
           </div>
           <p className="text-sm font-semibold text-ink/70">
-            Week 2's fresh affinity matrix is already waiting in your Kitchen —
-            the full game lets you chase it week after week, with 45 ingredients,
+            A fresh affinity matrix lands every real day — the full game lets
+            you chase it day after day, with 45 ingredients,
             the 5th slot, skins, and the whole Franchise catalog.
           </p>
           <div className="grid grid-cols-3 gap-2">
@@ -571,7 +636,7 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
                 <AffinityBadge tier={score.tier} multiplier={score.multiplier} />
                 <FlavorTag flavor={score.flavor} craving={craving} tier={score.tier} />
                 <span className="text-sm font-bold text-ink/60">
-                  +{formatCurry(perCook)} / cook
+                  +{formatCurry(perCook)} / click
                 </span>
                 {hasUntastedPair && (
                   <span className="cramped-hide flex items-center gap-1 text-sm font-bold text-ink/60">
@@ -585,7 +650,9 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
         ) : (
           <div className="flex items-center gap-2 text-sm font-semibold text-ink/70">
             <Icon name="info" className="text-primary" size={20} />
-            No recipe yet — open the Kitchen to cook one up!
+            {tutorialStart
+              ? "Your first recipe is prepped — press Start to open shop!"
+              : "No recipe yet — open the Kitchen to cook one up!"}
           </div>
         )}
 
@@ -604,19 +671,35 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
             only starts when the player presses Start Day. */}
         <ArcadeButton
           size="xl"
-          variant={!hasRecipe ? "tertiary" : !dayStarted || dayPaused ? "buy" : "primary"}
+          data-tut="start-btn"
+          variant={
+            !hasRecipe && !tutorialStart
+              ? "tertiary"
+              : !dayStarted || dayPaused
+                ? "buy"
+                : "primary"
+          }
           className={!hasRecipe || (!dayStarted && !dayPaused) ? "animate-pulse" : undefined}
           onClick={
-            !hasRecipe
-              ? () => onNavigate("kitchen")
-              : !dayStarted
-                ? () => setStartDayOpen(true)
-                : dayPaused
-                  ? togglePause
-                  : cookFromButton
+            // First run: the day starts on the spot (startDay seeds a starter
+            // recipe) — no Kitchen detour, no confirmation modal.
+            tutorialStart
+              ? startDay
+              : !hasRecipe
+                ? () => onNavigate("kitchen")
+                : !dayStarted
+                  ? () => setStartDayOpen(true)
+                  : dayPaused
+                    ? togglePause
+                    : cookFromButton
           }
         >
-          {!hasRecipe ? (
+          {tutorialStart ? (
+            <>
+              <Icon name="play_arrow" fill size={28} />
+              Start Day 1
+            </>
+          ) : !hasRecipe ? (
             <>
               <Icon name="skillet" fill size={26} />
               Open Kitchen
@@ -641,9 +724,9 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
       </ArcadePanel>
       )}
 
-      {!demoEnded && <GoalBar onOpenShop={onOpenShop} />}
+      {!demoEnded && shopUnlocked && <GoalBar onOpenShop={onOpenShop} />}
 
-      {!demoEnded && <CravingBar />}
+      {!demoEnded && cravingUnlocked && <CravingBar />}
 
       {startDayOpen && (
         <StartDayModal
@@ -688,9 +771,11 @@ function GoalBar({ onOpenShop }: { onOpenShop: () => void }) {
   }
   for (const d of DECORATIONS) {
     if (IS_DEMO && !DEMO_DECORATIONS.includes(d.id)) continue;
-    if ((ownedDecorations[d.id] ?? 0) >= d.maxQuantity) continue;
-    if (!target || d.cost < target.cost)
-      target = { name: d.name, icon: d.icon, tone: d.tone, cost: d.cost };
+    const qty = ownedDecorations[d.id] ?? 0;
+    if (qty >= d.maxQuantity) continue;
+    const cost = decorationCost(d, qty);
+    if (!target || cost < target.cost)
+      target = { name: d.name, icon: d.icon, tone: d.tone, cost };
   }
   if (!target) return null;
 

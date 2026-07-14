@@ -1,9 +1,13 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useGameStore } from "../store/useGameStore";
-import { useRecipeScore } from "../hooks/useRecipeScore";
+import { useRecipeScore, useEffects } from "../hooks/useRecipeScore";
 import { getAffinityData } from "../engine/affinityEngine";
 import { getDailyCraving } from "../engine/weekEngine";
 import { randomNeutralRecipe } from "../engine/recipeEngine";
+import { computeClickValue, NO_MODS } from "../engine/clickEngine";
+import { computeEffects } from "../engine/effects";
+import { UPGRADES } from "../engine/shopData";
+import { formatCurry } from "../lib/format";
 import { CATEGORIES, INGREDIENT_LIST, INGREDIENTS } from "../engine/ingredients";
 import { unlockedIngredientIds } from "../engine/franchiseData";
 import { IS_DEMO, DEMO_LOCKED_INGREDIENT_SET } from "../target";
@@ -14,6 +18,7 @@ import { FlavorTag } from "../components/FlavorTag";
 import { RecipeSlot } from "../components/RecipeSlot";
 import { IngredientCard } from "../components/IngredientCard";
 import { CookbookModal } from "../components/CookbookModal";
+import { RecipeTutorial } from "../components/RecipeTutorial";
 import { Icon } from "../components/arcade/Icon";
 import { PageHeader } from "../components/arcade/PageHeader";
 import { ArcadeButton } from "../components/arcade/ArcadeButton";
@@ -44,6 +49,39 @@ export function KitchenScreen({ onNavigate }: Props) {
   const [filter, setFilter] = useState<Filter>("all");
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [cookbookOpen, setCookbookOpen] = useState(false);
+  const [howToOpen, setHowToOpen] = useState(false);
+
+  const ownedDecorations = useGameStore((s) => s.ownedDecorations);
+  const weeksCompleted = useGameStore((s) => s.weeksCompleted);
+  const effects = useEffects();
+
+  // Comparative stats: what this recipe earns per click now, and its ceiling
+  // with every shop upgrade owned — makes "recipes differ" visible at a glance.
+  const perClickNow = computeClickValue(slots, matrix, effects, NO_MODS);
+  const maxEffects = useMemo(
+    () =>
+      computeEffects(
+        UPGRADES.map((u) => u.id),
+        ownedDecorations,
+        franchiseUpgrades,
+        weeksCompleted,
+      ),
+    [ownedDecorations, franchiseUpgrades, weeksCompleted],
+  );
+  const perClickMax = computeClickValue(slots, matrix, maxEffects, NO_MODS);
+
+  // Flavor mix (e.g. "2 spicy + 1 sweet") — teaches the majority rule live.
+  const flavorMix = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const id of slots) {
+      if (!id) continue;
+      const f = INGREDIENTS[id]?.flavor;
+      if (f) counts[f] = (counts[f] ?? 0) + 1;
+    }
+    return Object.entries(counts)
+      .map(([f, n]) => `${n} ${f}`)
+      .join(" + ");
+  }, [slots]);
 
   const unlockedIds = useMemo(() => {
     const ids = unlockedIngredientIds(franchiseUpgrades);
@@ -70,10 +108,19 @@ export function KitchenScreen({ onNavigate }: Props) {
         title="Kitchen"
         subtitle="Combine ingredients to discover curry recipes!"
         leading={
-          <ArcadeButton size="sm" onClick={() => onNavigate("journal")}>
-            <Icon name="science" fill size={18} className="text-primary" />
-            <span className="hidden sm:inline">Journal</span>
-          </ArcadeButton>
+          <div className="flex gap-2">
+            <ArcadeButton size="sm" onClick={() => onNavigate("journal")}>
+              <Icon name="science" fill size={18} className="text-primary" />
+              <span className="hidden sm:inline">Journal</span>
+            </ArcadeButton>
+            <ArcadeButton
+              size="sm"
+              onClick={() => setHowToOpen(true)}
+              aria-label="How cooking works"
+            >
+              <Icon name="help" fill size={18} className="text-primary" />
+            </ArcadeButton>
+          </div>
         }
         trailing={
           <ArcadeButton size="sm" onClick={() => setCookbookOpen(true)}>
@@ -108,6 +155,21 @@ export function KitchenScreen({ onNavigate }: Props) {
               <AffinityBadge tier={score.tier} multiplier={score.multiplier} />
               <FlavorTag flavor={score.flavor} craving={craving} tier={score.tier} />
             </div>
+            {filledCount > 0 && (
+              <div className="flex flex-col items-center gap-0.5 text-center">
+                {flavorMix.includes("+") && (
+                  <span className="text-xs font-semibold capitalize text-ink/55">
+                    {flavorMix} → {score.flavor} dish
+                  </span>
+                )}
+                <span className="flex items-center gap-1.5 text-xs font-bold text-ink/60">
+                  <Icon name="ads_click" size={14} />
+                  +{formatCurry(perClickNow)} / click
+                  <span className="font-semibold text-ink/40">·</span>
+                  up to +{formatCurry(perClickMax)} fully upgraded
+                </span>
+              </div>
+            )}
             <div className="flex gap-2">
               <ArcadeButton
                 size="sm"
@@ -192,6 +254,7 @@ export function KitchenScreen({ onNavigate }: Props) {
       </section>
 
       {cookbookOpen && <CookbookModal onClose={() => setCookbookOpen(false)} />}
+      {howToOpen && <RecipeTutorial onDone={() => setHowToOpen(false)} />}
     </div>
   );
 }

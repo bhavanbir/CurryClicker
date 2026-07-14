@@ -2,7 +2,14 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useGameStore } from "../store/useGameStore";
 import { formatCurry } from "../lib/format";
-import { UPGRADES, DECORATIONS, UPGRADE_MAP, upgradeCost, ladleValue } from "../engine/shopData";
+import {
+  UPGRADES,
+  DECORATIONS,
+  UPGRADE_MAP,
+  upgradeCost,
+  decorationCost,
+  ladleValue,
+} from "../engine/shopData";
 import type { Upgrade, Decoration } from "../types";
 import type { Screen } from "../navigation";
 import { Icon } from "./arcade/Icon";
@@ -186,7 +193,7 @@ export function ShopPanel({ onNavigate }: { onNavigate: (s: Screen) => void }) {
               <ShopCard
                 key={d.id}
                 item={d}
-                cost={d.cost}
+                cost={decorationCost(d, qty)}
                 statusLabel={
                   maxed ? (d.maxQuantity > 1 ? "Maxed" : "Owned") : level
                 }

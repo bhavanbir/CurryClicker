@@ -11,7 +11,6 @@ export interface DayModifier {
   bonus: string;
   cost: string;
   clickMult?: number; // per-click curry multiplier
-  autoMult?: number; // auto-production multiplier (0 disables it)
   daySeconds?: number; // absolute day length override
   dayLengthMult?: number; // relative day length
   critChanceMult?: number; // crit-circle spawn chance multiplier
@@ -38,22 +37,12 @@ export const DAY_CHOICES: DayModifier[] = [
     critBiasLow: true,
   },
   {
-    id: "slow_simmer",
-    name: "Slow Simmer",
-    icon: "self_improvement",
-    bonus: "Auto-production ×5",
-    cost: "Cooks are worth ×0.25",
-    autoMult: 5,
-    clickMult: 0.25,
-  },
-  {
     id: "rush_hour",
     name: "Rush Hour",
     icon: "bolt",
     bonus: "All curry ×3",
     cost: "The day is half as long",
     clickMult: 3,
-    autoMult: 3,
     dayLengthMult: 0.5,
   },
   {
@@ -61,9 +50,9 @@ export const DAY_CHOICES: DayModifier[] = [
     name: "Hand-Crafted",
     icon: "back_hand",
     bonus: "Cooks are worth ×10",
-    cost: "Auto-production is switched off",
+    cost: "Bonus circles never appear",
     clickMult: 10,
-    autoMult: 0,
+    critChanceMult: 0,
   },
   {
     id: "marathon",
@@ -72,7 +61,6 @@ export const DAY_CHOICES: DayModifier[] = [
     bonus: "The day lasts twice as long",
     cost: "All curry ×0.75",
     clickMult: 0.75,
-    autoMult: 0.75,
     dayLengthMult: 2,
   },
 ];

@@ -96,7 +96,9 @@ export function randomNeutralRecipe(
     }
     sample = pool.slice(0, count);
     const tier = computeRecipeScore(sample, matrix).tier;
-    if (tier !== "terrible" && tier !== "legendary") return sample;
+    // neutral/good only: a great+ starter would open the Naming Ceremony on a
+    // brand-new player's very first tap, mid-tutorial.
+    if (tier === "neutral" || tier === "good") return sample;
   }
   return sample;
 }
