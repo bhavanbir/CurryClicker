@@ -201,7 +201,7 @@ Dusk sky reuses `SceneBackdrop`'s existing evening tint (`#5e346e` → `#e07a2e`
 
 - **Deterministic draw order, every 32×32 cell:** (1) fill both sky bands flat; (2) stamp clouds; (3) stamp buildings, then awning, then lamp post, then lamp bulb/glow; (4) frame cells: border → sill → 1px inner shadow, leaving x∈[4,27],y∈[3,24] fully transparent (alpha 0). Same seed → same pixels.
 - **No anti-aliasing, no gradients-in-pixels** — the "gradient" is exactly two solid bands with a hard seam. Every edge is a 1px `#211915` ink line.
-- **Composition contract:** lower layers (sky/clouds/street/passerby) fill the full 32×32 opaquely; correctness depends on the **frame being drawn last** with its glass punched out — the opaque frame border is what clips everything to the glass rectangle, so no separate mask is authored. The passerby (16×16) is positioned by code inside the glass and is painted *before* the frame, so the frame edges crop it as it enters/exits.
+- **Composition contract:** the SKY cells are the opaque base; CLOUDS, STREET, and PASSERBY cells are transparent except their drawn content, so each layer beneath shows through. Correctness depends on the **frame being drawn last** with its glass punched out — the opaque frame border is what clips everything to the glass rectangle, so no separate mask is authored. The passerby (16×16) is positioned by code inside the glass and is painted *before* the frame, so the frame edges crop it as it enters/exits.
 - Cloud frames must tile: frame `7` (+24px) → frame `4` (0px) is a seamless +8px step; author the cloud shape to wrap horizontally within 32px.
 
 ### Wiring notes (one line each)
@@ -232,7 +232,7 @@ Fixed, non-purchasable dressing that makes the room read as a lived-in family cu
 
 ### 2. Sheet layout — `interior_props.png`
 
-One PNG, **uniform 32×32 cells**, 4 columns × 3 rows = **96×96 px**. Uniform cells keep the existing `Sprite.tsx` grid math untouched (it addresses `frame % columns`, `frame / columns` at one `frameW×frameH`); each prop is authored at its native size and **anchored bottom-center inside its 32×32 cell**, transparent padding elsewhere. Animated props occupy **contiguous** row-major cells.
+One PNG, **uniform 32×32 cells**, 4 columns × 3 rows = **128×96 px**. Uniform cells keep the existing `Sprite.tsx` grid math untouched (it addresses `frame % columns`, `frame / columns` at one `frameW×frameH`); each prop is authored at its native size and **anchored bottom-center inside its 32×32 cell**, transparent padding elsewhere. Animated props occupy **contiguous** row-major cells.
 
 | Cell idx | col,row | Prop / frame | Native art size | Anchor in cell |
 | --- | --- | --- | --- | --- |
@@ -371,7 +371,7 @@ front of a window is correct depth-sorting, not a bug.
 - `src/assets/sprites/scene/backdrop_mumbai.png` — **320×192**, opaque
 - `src/assets/sprites/scene/window_street.png` — **128×128** (4×4 @ 32×32), transparent
 - `src/assets/sprites/scene/window_passerby.png` — **32×16** (2×1 @ 16×16), transparent
-- `src/assets/sprites/scene/interior_props.png` — **96×96** (4×3 @ 32×32), transparent
+- `src/assets/sprites/scene/interior_props.png` — **128×96** (4×3 @ 32×32), transparent
 
 Seven PNGs total (four backdrop variants + three shared sprite sheets).
 
