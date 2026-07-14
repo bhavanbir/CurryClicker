@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import { useGameStore } from "../store/useGameStore";
 import { getDailySpecial } from "../engine/weekEngine";
@@ -91,6 +92,11 @@ export function ChefSpecialPanel() {
       {card}
     </aside>
   ) : (
+    // Portaled to <body>: the tab is fixed to the viewport, but it's mounted
+    // inside the scene wrapper, whose shake animation transforms it — and a
+    // transformed ancestor hijacks `position: fixed`, snapping the tab into
+    // the kitchen frame mid-shake.
+    createPortal(
     <button
       type="button"
       onClick={() => setExpanded(true)}
@@ -101,7 +107,9 @@ export function ChefSpecialPanel() {
       <span className="text-xs font-black uppercase tracking-widest [writing-mode:vertical-rl]">
         Special
       </span>
-    </button>
+    </button>,
+    document.body,
+    )
   );
 }
 

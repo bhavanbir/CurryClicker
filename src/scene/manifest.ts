@@ -6,6 +6,7 @@
 import type { SpriteSheet } from "./Sprite";
 import propsUrl from "../assets/sprites/scene/props.png";
 import customerUrl from "../assets/sprites/scene/customer.png";
+import customerDastarUrl from "../assets/sprites/scene/customer_dastar.png";
 import curryUrl from "../assets/sprites/scene/curry.png";
 
 /** screen px drawn per source px — bumps all pixel art up to a chunky scale */
@@ -13,7 +14,8 @@ export const PIXEL_SCALE = 3;
 
 const PROPS: SpriteSheet = { src: propsUrl, frameW: 16, frameH: 16, columns: 4, rows: 1 };
 const CUSTOMER: SpriteSheet = { src: customerUrl, frameW: 16, frameH: 16, columns: 3, rows: 4 };
-const CURRY: SpriteSheet = { src: curryUrl, frameW: 16, frameH: 16, columns: 2, rows: 1 };
+const CUSTOMER_DASTAR: SpriteSheet = { src: customerDastarUrl, frameW: 16, frameH: 16, columns: 3, rows: 4 };
+const CURRY: SpriteSheet = { src: curryUrl, frameW: 16, frameH: 16, columns: 5, rows: 1 };
 
 export interface SpriteAnim {
   sheet: SpriteSheet;
@@ -29,20 +31,28 @@ export const PROP = {
   window: { sheet: PROPS, frames: [3], fps: 0 },
 } satisfies Record<string, SpriteAnim>;
 
-// Curry dishes that pile up on the counter — two colour variants for variety.
-export const CURRY_VARIANTS: SpriteAnim[] = [
-  { sheet: CURRY, frames: [0], fps: 0 },
-  { sheet: CURRY, frames: [1], fps: 0 },
-];
+// Curry dishes that pile up on the counter — one colour variant per column.
+export const CURRY_VARIANTS: SpriteAnim[] = Array.from({ length: CURRY.columns }, (_, i) => ({
+  sheet: CURRY,
+  frames: [i],
+  fps: 0,
+}));
 
-// Customer — 4 palette variants (sheet rows), each with an idle/seated frame
-// and a 2-frame walk cycle. Pick a stable variant per customer (e.g. id % 4).
-export const CUSTOMER_VARIANTS = CUSTOMER.rows;
+// Customer — palette variants across two sheets (base + dastar), each row an
+// idle/seated frame and a 2-frame walk cycle. Pick a stable variant per
+// customer (e.g. id % CUSTOMER_VARIANTS).
+export const CUSTOMER_VARIANTS = CUSTOMER.rows + CUSTOMER_DASTAR.rows;
 
 export function customerAnim(variant: number): { idle: SpriteAnim; walk: SpriteAnim } {
-  const base = (Math.abs(variant) % CUSTOMER_VARIANTS) * CUSTOMER.columns;
+  let row = Math.abs(variant) % CUSTOMER_VARIANTS;
+  let sheet = CUSTOMER;
+  if (row >= CUSTOMER.rows) {
+    sheet = CUSTOMER_DASTAR;
+    row -= CUSTOMER.rows;
+  }
+  const base = row * sheet.columns;
   return {
-    idle: { sheet: CUSTOMER, frames: [base], fps: 0 },
-    walk: { sheet: CUSTOMER, frames: [base + 1, base + 2], fps: 6 },
+    idle: { sheet, frames: [base], fps: 0 },
+    walk: { sheet, frames: [base + 1, base + 2], fps: 6 },
   };
 }

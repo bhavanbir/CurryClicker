@@ -48,7 +48,7 @@ import { BASE_UNLOCKED_SLOTS, TASTE_COOKS_TO_REVEAL } from "../config";
 import { IS_DEMO, DEMO_DECORATIONS, DEMO_LOCKED_INGREDIENT_SET } from "../target";
 
 export const SAVE_KEY = "curry-clicker-save";
-export const SAVE_VERSION = 14;
+export const SAVE_VERSION = 15;
 
 // Guided first run, revealed one step at a time:
 //   start   → only the scene + Start button visible (spotlight on Start)
@@ -810,6 +810,9 @@ export const useGameStore = create<GameState>()(
       },
 
       placeDecoration: (decorationId, xPct, yPct) => {
+        // Non-finite coords would persist as null and pile the sprite into the
+        // scene's top-left corner (NaN survives the clamps below).
+        if (!Number.isFinite(xPct) || !Number.isFinite(yPct)) return false;
         const s = get();
         const owned = s.ownedDecorations[decorationId] ?? 0;
         if (owned <= 0) return false;
@@ -1102,6 +1105,18 @@ export const useGameStore = create<GameState>()(
           // Guided first run split into steps; anyone past the old welcome
           // modal has seen it all.
           p.tutorialStep = (p.hasOnboarded ?? true) ? "done" : "start";
+        }
+        if (version < 15) {
+          // Heal placements with non-finite coords (NaN serializes to null in
+          // JSON; v13's `!== undefined` check let those through). They render
+          // piled up in the scene's top-left corner — re-home them to free
+          // wall slots instead.
+          const healed: Placement[] = [];
+          for (const pl of (p.decorationPlacements as Placement[]) ?? []) {
+            if (Number.isFinite(pl.xPct) && Number.isFinite(pl.yPct)) healed.push(pl);
+            else healed.push({ ...pl, ...nextFreeSpot(healed) });
+          }
+          p.decorationPlacements = healed;
         }
         return p as unknown as GameState;
       },
