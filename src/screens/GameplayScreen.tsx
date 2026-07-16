@@ -253,6 +253,26 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
     else cook(0, 0);
   }
 
+  // Spacebar cooks at the cursor when it's over the scene; falls back to the
+  // button's center-burst otherwise (cursor off-scene or untracked).
+  const pointerRef = useRef<{ x: number; y: number } | null>(null);
+  function cookFromSpace() {
+    const rect = sceneWrapRef.current?.getBoundingClientRect();
+    const p = pointerRef.current;
+    if (
+      rect &&
+      p &&
+      p.x >= rect.left &&
+      p.x <= rect.right &&
+      p.y >= rect.top &&
+      p.y <= rect.bottom
+    ) {
+      cook(p.x - rect.left, p.y - rect.top);
+    } else {
+      cookFromButton();
+    }
+  }
+
   // Scene shake for big moments only (never plain clicks — over-juicing reads
   // as noise). Direct classList toggle: no rerender, restarts cleanly.
   function shakeScene(strength: "sm" | "lg") {
@@ -364,9 +384,12 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
 
   // Spacebar cooks — same guarded path as the Cook! button. Skips form fields
   // and focused buttons so native keyboard behavior still works there.
-  const cookFromButtonRef = useRef(cookFromButton);
-  cookFromButtonRef.current = cookFromButton;
+  const cookFromSpaceRef = useRef(cookFromSpace);
+  cookFromSpaceRef.current = cookFromSpace;
   useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      pointerRef.current = { x: e.clientX, y: e.clientY };
+    };
     const onKey = (e: KeyboardEvent) => {
       if (e.code !== "Space" || e.repeat) return;
       const t = e.target as HTMLElement | null;
@@ -381,10 +404,14 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
         return;
       e.preventDefault(); // no page scroll
       if (critSpaceRef.current()) return; // hovering the crit circle? hit it
-      cookFromButtonRef.current();
+      cookFromSpaceRef.current();
     };
+    window.addEventListener("pointermove", onMove);
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("keydown", onKey);
+    };
   }, []);
 
   return (
