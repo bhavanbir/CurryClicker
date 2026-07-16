@@ -73,14 +73,18 @@ export function TopBar({ screen, onNavigate, onFeedback }: Props) {
               {formatCurry(currentCurry, 1)}
             </span>
           </div>
-          <button
-            type="button"
-            onClick={onFeedback}
-            aria-label="Send feedback"
-            className="flex h-9 w-9 items-center justify-center rounded-lg border-2 border-ink bg-white text-ink shadow-arcade-sm transition-all hover:-translate-y-0.5"
-          >
-            <Icon name="mail" size={20} />
-          </button>
+          {/* Feedback is a web-demo feature; the desktop build ships without
+              the FormSubmit relay entirely. */}
+          {IS_DEMO && (
+            <button
+              type="button"
+              onClick={onFeedback}
+              aria-label="Send feedback"
+              className="flex h-9 w-9 items-center justify-center rounded-lg border-2 border-ink bg-white text-ink shadow-arcade-sm transition-all hover:-translate-y-0.5"
+            >
+              <Icon name="mail" size={20} />
+            </button>
+          )}
           <button
             type="button"
             onClick={() => onNavigate("settings")}

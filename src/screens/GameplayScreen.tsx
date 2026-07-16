@@ -773,7 +773,7 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
         <RecipeNamingModal fingerprint={namingFp} onClose={() => setNamingFp(null)} />
       )}
 
-      {feedbackOpen && <FeedbackModal onClose={() => setFeedbackOpen(false)} />}
+      {IS_DEMO && feedbackOpen && <FeedbackModal onClose={() => setFeedbackOpen(false)} />}
     </div>
   );
 }

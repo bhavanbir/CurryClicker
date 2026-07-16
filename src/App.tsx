@@ -150,7 +150,7 @@ export default function App() {
         <RecipeTutorial onDone={() => setTutorialStep("week1")} />
       )}
       <FeatureIntroLayer />
-      {feedbackOpen && <FeedbackModal onClose={() => setFeedbackOpen(false)} />}
+      {IS_DEMO && feedbackOpen && <FeedbackModal onClose={() => setFeedbackOpen(false)} />}
     </div>
   );
 }
