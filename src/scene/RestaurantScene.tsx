@@ -58,6 +58,11 @@ export function RestaurantScene({
   onDinerFed,
 }: Props) {
   const activeSkin = useGameStore((s) => s.activeSkin);
+  const darkMode = useGameStore((s) => s.darkMode);
+  // Dark mode is Neon Night territory: the daylight skins glare against the
+  // dark chrome (the scene-frame already flips to neon), so the room follows.
+  // The picked skin still applies in light mode.
+  const skin = darkMode ? "neon" : activeSkin;
   const placements = useGameStore((s) => s.decorationPlacements);
   const removePlacement = useGameStore((s) => s.removePlacement);
   const { expansionLevel } = useEffects();
@@ -98,7 +103,7 @@ export function RestaurantScene({
          are fixed-pixel; a huge room reads empty). */
       className="scene-frame relative isolate h-[clamp(240px,45dvh,560px)] w-full cursor-pointer select-none overflow-hidden"
     >
-      <SceneBackdrop skin={activeSkin} />
+      <SceneBackdrop skin={skin} />
 
       {/* OPEN / CLOSED sign */}
       <div className="pointer-events-none absolute left-1/2 top-2 z-[2500] -translate-x-1/2 rounded-full border-2 border-ink bg-curry-yellow px-3 py-0.5 text-[10px] font-black uppercase tracking-widest text-ink shadow-arcade-sm">
@@ -150,7 +155,7 @@ export function RestaurantScene({
       ))}
 
       {/* Foreground counter, piling up with cooked curry */}
-      <Counter count={filled} skin={activeSkin} />
+      <Counter count={filled} skin={skin} />
 
       {/* Decorate-mode overlay (tray, grid targets, skin picker) */}
       {editing && <SceneEditor onClose={() => setEditing(false)} />}

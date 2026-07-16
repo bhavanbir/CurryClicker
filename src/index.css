@@ -48,6 +48,17 @@
   --cream-100: 253 246 227;
   --cream-200: 247 249 252;
   --tertiary-fixed: 255 222 170;
+  /* Loud accents as channels so dark mode can desaturate them — full-saturation
+     orange/green/red vibrate against dark surfaces and strain the eyes. */
+  --primary: 255 140 0;
+  --curry-orange: 255 122 0;
+  --curry-yellow: 255 184 0;
+  --buy: 74 222 128;
+  --tier-terrible: 220 38 38;
+  --tier-good: 22 163 74;
+  --tertiary: 250 188 68;
+  --flavor-spicy: 239 68 68;
+  --glow: 255 140 0; /* crit / on-fire glow hue */
 }
 /* Dark = the light palette's warm cream/orange world in coffee tones: warm
    off-white ink, elevated brown panels, and shadows that stay dark (shadows
@@ -63,6 +74,17 @@
   --cream-100: 62 53 44;
   --cream-200: 48 42 36;
   --tertiary-fixed: 110 78 34;
+  /* Same hues, dimmer and heavily desaturated — accents should read as
+     warm embers against the coffee surfaces, not neon signs. */
+  --primary: 196 130 62;
+  --curry-orange: 186 110 52;
+  --curry-yellow: 198 158 78;
+  --buy: 96 150 114;
+  --tier-terrible: 174 82 82;
+  --tier-good: 76 138 98;
+  --tertiary: 192 152 80;
+  --flavor-spicy: 196 100 88;
+  --glow: 196 130 62;
 }
 
 html,
@@ -87,10 +109,11 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Dark mode keeps the warm curry glow — slightly stronger so it doesn't go flat */
+/* Dark mode keeps a faint warm curry glow — muted hue, low opacity, so the
+   page reads as a dim room rather than an orange spotlight */
 .dark body {
   background-image:
-    radial-gradient(1100px 500px at 50% -8%, rgba(255, 140, 0, 0.16), transparent 60%),
+    radial-gradient(1100px 500px at 50% -8%, rgb(var(--glow) / 0.09), transparent 60%),
     linear-gradient(rgb(var(--cream)), rgb(var(--cream-100)));
 }
 
@@ -296,12 +319,21 @@ body {
   animation: scene-flash 0.3s ease-out forwards;
 }
 @keyframes on-fire-glow {
-  0%, 100% { box-shadow: 0 0 12px 2px rgba(255, 122, 0, 0.55); }
-  50% { box-shadow: 0 0 24px 6px rgba(255, 122, 0, 0.85); }
+  0%, 100% { box-shadow: 0 0 12px 2px rgb(var(--glow) / 0.55); }
+  50% { box-shadow: 0 0 24px 6px rgb(var(--glow) / 0.85); }
 }
 .on-fire-glow {
   animation: on-fire-glow 0.8s ease-in-out infinite;
   border-radius: 12px;
+}
+/* Live crit circle: pulsing glow that carries the arcade offset shadow, since
+   it replaces shadow-arcade in the button's box-shadow slot */
+@keyframes crit-glow {
+  0%, 100% { box-shadow: 0 0 14px 4px rgb(var(--glow) / 0.7), 6px 6px 0 0 rgb(var(--shadow)); }
+  50% { box-shadow: 0 0 30px 10px rgb(var(--glow)), 6px 6px 0 0 rgb(var(--shadow)); }
+}
+.crit-glow {
+  animation: crit-glow 0.6s ease-in-out infinite;
 }
 @keyframes crit-telegraph {
   0%, 100% { transform: translate(-50%, -50%) scale(0.85) rotate(-4deg); opacity: 0.6; }
@@ -328,5 +360,10 @@ body {
   .crit-telegraph {
     animation: none;
     opacity: 0.8;
+  }
+  /* same deal: static glow keeps the crit circle findable without motion */
+  .crit-glow {
+    animation: none;
+    box-shadow: 0 0 20px 6px rgb(var(--glow) / 0.8), 6px 6px 0 0 rgb(var(--shadow));
   }
 }

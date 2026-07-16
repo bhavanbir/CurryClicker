@@ -6,8 +6,9 @@ export default {
     extend: {
       colors: {
         // Spicetone Arcade — light/warm palette from the Stitch mockups.
-        // Neutrals are CSS variables (RGB channels) so `.dark` on <html> can
-        // swap the whole theme; accents (primary/buy/tier/…) stay fixed.
+        // Neutrals AND the loud accents are CSS variables (RGB channels) so
+        // `.dark` on <html> can swap the theme and desaturate the accents;
+        // quiet accents (great/legendary/rarity/most flavors) stay fixed.
         cream: {
           DEFAULT: "rgb(var(--cream) / <alpha-value>)",
           50: "rgb(var(--cream-50) / <alpha-value>)",
@@ -16,30 +17,30 @@ export default {
         },
         ink: "rgb(var(--ink) / <alpha-value>)", // near-black for borders + text (light in dark mode)
         primary: {
-          DEFAULT: "#ff8c00",
+          DEFAULT: "rgb(var(--primary) / <alpha-value>)",
           dark: "#e66e00",
           container: "#ff8c00",
           fixed: "#ffdcc3",
         },
         curry: {
-          orange: "#ff7a00",
-          yellow: "#ffb800",
+          orange: "rgb(var(--curry-orange) / <alpha-value>)",
+          yellow: "rgb(var(--curry-yellow) / <alpha-value>)",
         },
         tertiary: {
-          DEFAULT: "#fabc44",
+          DEFAULT: "rgb(var(--tertiary) / <alpha-value>)",
           fixed: "rgb(var(--tertiary-fixed) / <alpha-value>)",
           container: "#da9f28",
         },
-        buy: "#4ade80", // green "$ buy" buttons
+        buy: "rgb(var(--buy) / <alpha-value>)", // green "$ buy" buttons
         tier: {
-          terrible: "#dc2626",
+          terrible: "rgb(var(--tier-terrible) / <alpha-value>)",
           neutral: "#57534e",
-          good: "#16a34a",
+          good: "rgb(var(--tier-good) / <alpha-value>)",
           great: "#d97706",
           legendary: "#b45309",
         },
         flavor: {
-          spicy: "#ef4444",
+          spicy: "rgb(var(--flavor-spicy) / <alpha-value>)",
           mild: "#0ea5e9",
           sweet: "#ec4899",
           savory: "#d97706",

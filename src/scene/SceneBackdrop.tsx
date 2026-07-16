@@ -21,7 +21,8 @@ export const BACKDROPS: Record<SceneSkin, string> = {
 export function SceneBackdrop({ skin = "default" }: { skin?: SceneSkin }) {
   // ponytail: quantized selector so the backdrop re-renders ~32x/day, not every tick
   const dayProgress = useGameStore((st) => Math.round(st.dayProgress * 32) / 32);
-  const morning = Math.max(0, 1 - dayProgress * 2); // fades out by midday
+  // Neon Night is perpetual night — no warm morning daylight over it
+  const morning = skin === "neon" ? 0 : Math.max(0, 1 - dayProgress * 2); // fades out by midday
   const evening = Math.max(0, dayProgress * 2 - 1); // fades in after midday
   return (
     <div className="pointer-events-none absolute inset-0">

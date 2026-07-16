@@ -225,7 +225,7 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
     // 25% chance to spawn a critical circle (if none is up) — click it before
     // it expires for the tier's multiplier. Crit clicks skip this roll; their
     // follow-up comes from the jackpot chain in clickCrit instead.
-    const critChance = Math.min(0.25 * (dayMod?.critChanceMult ?? 1), 0.9);
+    const critChance = Math.min(0.4 * (dayMod?.critChanceMult ?? 1), 0.9);
     if (critMult === 1 && !crit && Math.random() < critChance) {
       spawnCrit(rollCritTier(dayMod?.critBiasLow), 0);
     }
@@ -484,13 +484,13 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
               type="button"
               aria-label={`Critical hit! ×${crit.tier.mult}`}
               initial={{ scale: 0 }}
-              animate={{ scale: [0, 1.2, 1] }}
+              animate={{ scale: [0, 1.35, 1] }}
               exit={{ scale: 0, opacity: 0 }}
               transition={{ duration: 0.25, times: [0, 0.6, 1] }}
               onPointerDown={() => clickCrit(crit)}
               onPointerEnter={() => (critHoverRef.current = true)}
               onPointerLeave={() => (critHoverRef.current = false)}
-              className={`absolute z-40 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-4 border-ink font-display font-black shadow-arcade ${crit.tier.className}`}
+              className={`absolute z-40 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-4 border-ink font-display font-black crit-glow ${crit.tier.className}`}
               style={{
                 left: crit.x,
                 top: crit.y,
