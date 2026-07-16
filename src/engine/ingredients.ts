@@ -81,7 +81,7 @@ export const INGREDIENT_LIST: Ingredient[] = [
   // --- Mithai Set (56–60, franchise: set_mithai) ---
   { id: "khoya", name: "Khoya", icon: "cloud", color: "text-stone-200", baseValue: 8, category: "dairy", flavor: "sweet", rarity: "uncommon", description: "Milk simmered down to its sweetest self.", set: "mithai" },
   { id: "pistachio", name: "Pistachio", icon: "lens", color: "text-green-400", baseValue: 7, category: "protein", flavor: "sweet", rarity: "uncommon", description: "Emerald slivers crowning every sweet.", set: "mithai" },
-  { id: "rose_syrup", name: "Rose Syrup", icon: "water_drop", color: "text-pink-500", baseValue: 6, category: "vegetable", flavor: "sweet", rarity: "common", description: "Ruby-red rooh afza, summer in a bottle.", set: "mithai" },
+  { id: "rose_syrup", name: "Rose Syrup", icon: "water_drop", color: "text-pink-500", baseValue: 6, category: "vegetable", flavor: "sweet", rarity: "common", description: "Ruby-red rose sharbat, summer in a bottle.", set: "mithai" },
   { id: "cardamom_sugar", name: "Cardamom Sugar", icon: "auto_awesome", color: "text-emerald-300", baseValue: 9, category: "spice", flavor: "sweet", rarity: "rare", description: "Fragrant crystals that perfume the whole tray.", set: "mithai" },
   { id: "saffron_milk", name: "Saffron Milk", icon: "wb_sunny", color: "text-yellow-400", baseValue: 10, category: "dairy", flavor: "unique", rarity: "rare", description: "Golden kesar doodh, dessert's finishing touch.", set: "mithai" },
 ];

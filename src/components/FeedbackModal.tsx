@@ -96,6 +96,19 @@ export function FeedbackModal({ onClose }: { onClose: () => void }) {
               className="mt-1 w-full rounded-md border-4 border-ink bg-cream-50 px-3 py-2 text-sm font-semibold text-ink outline-none focus:bg-white"
             />
 
+            <p className="mt-2 text-[11px] font-semibold text-ink/50">
+              Sent to us via FormSubmit.co — see our{" "}
+              <a
+                href="https://github.com/bhavanbir/CurryClicker/blob/main/PRIVACY.md"
+                target="_blank"
+                rel="noreferrer"
+                className="underline"
+              >
+                privacy policy
+              </a>
+              .
+            </p>
+
             {status === "error" && (
               <p className="mt-2 text-xs font-bold text-tier-terrible">
                 Couldn't send — check your connection and try again.

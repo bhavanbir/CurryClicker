@@ -47,6 +47,12 @@
     "asarUnpack": [
       "node_modules/steamworks.js/**"
     ],
+    "extraFiles": [
+      {
+        "from": "public/THIRD-PARTY-LICENSES.txt",
+        "to": "THIRD-PARTY-LICENSES.txt"
+      }
+    ],
     "win": {
       "target": "nsis"
     }
