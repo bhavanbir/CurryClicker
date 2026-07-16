@@ -202,6 +202,24 @@ export function SettingsScreen({ onNavigate }: Props) {
           </div>
         )}
       </Group>
+
+      <Group title="Legal">
+        <LinkRow
+          icon="policy"
+          label="Privacy Policy"
+          href="https://github.com/bhavanbir/CurryClicker/blob/main/PRIVACY.md"
+        />
+        <LinkRow
+          icon="gavel"
+          label="Terms of Service"
+          href="https://github.com/bhavanbir/CurryClicker/blob/main/TERMS.md"
+        />
+        <LinkRow
+          icon="license"
+          label="Third-Party Licenses"
+          href="https://github.com/bhavanbir/CurryClicker/blob/main/public/THIRD-PARTY-LICENSES.txt"
+        />
+      </Group>
     </div>
   );
 }
@@ -214,6 +232,25 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
       </h2>
       {children}
     </ArcadePanel>
+  );
+}
+
+// External links: in the browser these open a new tab; in the desktop build
+// window.open is intercepted and routed to the system browser (electron/main.cjs).
+function LinkRow({ icon, label, href }: { icon: string; label: string; href: string }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="flex items-center justify-between rounded-lg py-0.5 transition-colors hover:bg-cream-100"
+    >
+      <span className="flex items-center gap-2 text-sm font-bold text-ink">
+        <Icon name={icon} size={20} className="text-primary" />
+        {label}
+      </span>
+      <Icon name="open_in_new" size={18} className="text-ink/50" />
+    </a>
   );
 }
 
