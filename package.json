@@ -10,10 +10,11 @@
     "dev:demo": "vite --mode demo",
     "build": "tsc -b && vite build",
     "build:demo": "tsc -b && vite build --mode demo",
-    "preview": "vite preview",
+    "preview": "npm run build && wrangler dev",
     "typecheck": "tsc -b",
     "desktop:dev": "node scripts/desktop-dev.mjs",
-    "desktop:build": "npm run build && electron-builder"
+    "desktop:build": "npm run build && electron-builder",
+    "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
     "framer-motion": "^11.3.0",
@@ -23,6 +24,7 @@
     "zustand": "^4.5.5"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.45.1",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "4.7",
@@ -32,7 +34,8 @@
     "postcss": "^8.4.39",
     "tailwindcss": "^3.4.7",
     "typescript": "^5.5.4",
-    "vite": "^6.4.3"
+    "vite": "^6.4.3",
+    "wrangler": "^4.112.0"
   },
   "build": {
     "appId": "com.spicetone.curryclicker",
