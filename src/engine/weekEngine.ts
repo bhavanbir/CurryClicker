@@ -7,7 +7,17 @@ import { FLAVORS, BASE_INGREDIENT_IDS } from "./ingredients";
 import { IS_DEMO, DEMO_LOCKED_INGREDIENT_SET } from "../target";
 import { makeRng } from "../lib/rng";
 
-export function getCurrentWeekId(d: Date = new Date()): string {
+// Anti-cheat: on desktop the clock is anchored to Steam server time (synced in
+// useWeeklySeed), so changing the system clock can't force day/week rollovers.
+// Offset stays 0 on web or when Steam is unavailable. Local timezone still
+// applies, so rollover remains local midnight.
+let clockOffsetMs = 0;
+export function syncClock(serverEpochSec: number): void {
+  clockOffsetMs = serverEpochSec * 1000 - Date.now();
+}
+const now = () => new Date(Date.now() + clockOffsetMs);
+
+export function getCurrentWeekId(d: Date = now()): string {
   // ISO-8601 week number.
   const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
   const dayNum = (date.getUTCDay() + 6) % 7; // Mon=0 .. Sun=6
@@ -26,7 +36,7 @@ export function getCurrentWeekId(d: Date = new Date()): string {
 
 // Local calendar date, e.g. "2026-07-07". The affinity matrix, daily rivals,
 // and daily leaderboard all reseed when this rolls over at local midnight.
-export function getCurrentDateId(d: Date = new Date()): string {
+export function getCurrentDateId(d: Date = now()): string {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${d.getFullYear()}-${m}-${day}`;

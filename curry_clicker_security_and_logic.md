@@ -1366,3 +1366,33 @@ Work through this before opening to the public:
 - [ ] Week ID validated against `weekly_seeds` table before insert
 - [ ] Leaderboard ranks display-only — never used to gate gameplay content
       (prevents rank manipulation from being a meaningful attack target)
+
+---
+
+## Appendix — Shipped Client-Side Anti-Cheat (Steam build, no backend)
+
+The sections above describe a server-backed design. The shipped Steam build is
+fully client-side; the only Steam-visible number is the int stat
+`daily_curry_best` written by the client. What ships instead:
+
+| Threat | Countermeasure |
+|--------|----------------|
+| Backward clock jumps (seed reroll, clock-flap trophy farm) | `ensureCurrentDate`/`ensureCurrentWeek` refuse ids that sort before the persisted one |
+| Forward clock jumps (rollover farming) | Daily/weekly rollover anchored to Steam server time (`utils.getServerRealTime` via IPC), re-synced every 30s |
+| Autoclickers | 25 CPS rolling cap in `cook()`; over-cap clicks silently dropped |
+| Synthetic/injected input | `cook()` requires window focus + a trusted (`isTrusted`) input within 100ms |
+| Crit-circle aim bots | Hits under 130ms after a random-position spawn are rejected |
+| Devtools console | `devTools` disabled in production Electron builds |
+| Save editing | Load-time clamps in `merge()`: finite, non-negative, ≤1e15, dailyCurry ≤ totalCurryAllTime |
+| Weak-day stat regression | `submitDayScore` max-merges: never lowers the recorded best |
+
+Accepted risks (unfixable without a backend, deliberately not attempted):
+
+- **Direct stat forging** (SAM etc.): any client-written Steam stat is
+  forgeable. Not competitively displayed today; if a real Steam leaderboard
+  ships, design server/heuristic validation *then*.
+- **Bundle modification / memory editing / remote-debug flags**: anyone at
+  this tier deletes the checks themselves. asar packaging is the only speed bump.
+- **Timezone shifts**: ±1 day even with trusted epoch; the forward-only guard
+  bounds it to a one-time shift, not a farmable loop.
+- **Achievements**: SAM-forgeable for every Steam game. Accepted.

@@ -42,6 +42,28 @@ interface Props {
 
 let floatId = 0;
 
+// Anti-cheat: every cook must trace back to a real (isTrusted) input moments
+// ago. Synthetic events (dispatchEvent, console scripts, injection) never
+// refresh this timestamp, so they earn nothing.
+let lastTrustedInput = 0;
+if (typeof window !== "undefined") {
+  for (const type of ["pointerdown", "pointerup", "keydown"] as const) {
+    window.addEventListener(
+      type,
+      (e) => {
+        if (e.isTrusted) lastTrustedInput = performance.now();
+      },
+      true,
+    );
+  }
+}
+
+// Anti-cheat: rolling 1s click cap. Humans peak ~15-20 CPS with mouse+space;
+// Crazy Curry's top reward floor is 8 CPS, so 25 leaves generous headroom.
+// Over-cap cooks are silently dropped — no feedback for autoclickers.
+const CPS_CAP = 25;
+const cookTimes: number[] = [];
+
 // Critical circle tiers — anti-autoclicker bait. Low mults are common, big and
 // slow; high mults are rare, tiny and fast. Weights sum to 100.
 const CRIT_TIERS = [
@@ -134,6 +156,7 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
     tier: CritTier;
     chain: number; // 0 = normal spawn; >0 = jackpot chain step
     phase: "telegraph" | "live";
+    liveAt: number; // reaction-floor anchor: live time (or telegraph start when chained)
   } | null>(null);
   const critHoverRef = useRef(false); // mouse currently over the crit circle
   const reduced = useReducedMotion() ?? false;
@@ -179,6 +202,12 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
 
   function cook(x: number, y: number, critMult = 1) {
     if (!hasRecipe || !dayStarted || dayPaused) return; // shop closed or paused
+    // Anti-cheat gate: focused window, real recent input, human-plausible rate.
+    const nowMs = performance.now();
+    if (!document.hasFocus() || nowMs - lastTrustedInput > 100) return;
+    while (cookTimes.length > 0 && nowMs - cookTimes[0] > 1000) cookTimes.shift();
+    if (cookTimes.length >= CPS_CAP) return;
+    cookTimes.push(nowMs);
     const result = handleClick(slots, getAffinityData(seed).matrix, effects, mods);
     if (result.value <= 0) return;
 
@@ -335,14 +364,16 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
     const x = margin + Math.random() * Math.max(1, rect.width - margin * 2);
     const y = margin + Math.random() * Math.max(1, rect.height - margin * 2);
     if (chain === 0) {
-      setCrit({ id: critId, x, y, tier, chain, phase: "live" });
+      setCrit({ id: critId, x, y, tier, chain, phase: "live", liveAt: performance.now() });
       window.setTimeout(
         () => setCrit((c) => (c?.id === critId ? null : c)),
         tier.ms,
       );
     } else {
       // Chained circles telegraph first: a 400ms "incoming" cue, then live.
-      setCrit({ id: critId, x, y, tier, chain, phase: "telegraph" });
+      // liveAt counts from the telegraph: the position is announced, so the
+      // reaction floor is already satisfied by the time it turns clickable.
+      setCrit({ id: critId, x, y, tier, chain, phase: "telegraph", liveAt: performance.now() });
       window.setTimeout(() => {
         setCrit((c) => (c?.id === critId ? { ...c, phase: "live" } : c));
         window.setTimeout(
@@ -355,6 +386,9 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
 
   function clickCrit(c: NonNullable<typeof crit>) {
     if (c.phase !== "live") return;
+    // Anti-cheat: sub-human reaction (circles spawn at random positions, so a
+    // real hit needs ~200ms reaction + mouse travel). Aim-bots get nothing.
+    if (performance.now() - c.liveAt < 130) return;
     // cook() below is day-guarded, but the chained spawnCrit is not — block
     // the whole thing once the day is over or paused.
     if (!dayStarted || dayPaused) return;

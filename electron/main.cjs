@@ -45,8 +45,9 @@ ipcMain.handle("save:write", (_e, data) => {
 });
 
 ipcMain.handle("steam:achievement", (_e, id) => steam.unlockAchievement(id));
-ipcMain.handle("steam:score", (_e, value) => steam.submitWeekScore(value));
+ipcMain.handle("steam:score", (_e, value) => steam.submitDayScore(value));
 ipcMain.handle("steam:playerName", () => steam.getPlayerName());
+ipcMain.handle("steam:serverTime", () => steam.getServerTime());
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -60,6 +61,7 @@ function createWindow() {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
+      devTools: DEV, // anti-cheat: no console/injection in production builds
     },
   });
 

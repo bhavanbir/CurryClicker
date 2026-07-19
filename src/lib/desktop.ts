@@ -5,8 +5,9 @@ export interface DesktopBridge {
   readSave(): Promise<string | null>;
   writeSave(data: string): Promise<void>;
   unlockAchievement(id: string): Promise<boolean>;
-  submitWeekScore(value: number): Promise<boolean>;
+  submitDayScore(value: number): Promise<boolean>;
   getSteamPlayerName(): Promise<string | null>;
+  getServerTime(): Promise<number | null>;
 }
 
 declare global {
@@ -39,8 +40,8 @@ export function unlockAchievement(badgeId: string): void {
   if (name) void desktop()?.unlockAchievement(name);
 }
 
-export function submitWeekScore(value: number): void {
-  void desktop()?.submitWeekScore(value);
+export function submitDayScore(value: number): void {
+  void desktop()?.submitDayScore(value);
 }
 
 // Steam persona name, or null on web / when Steam isn't running.

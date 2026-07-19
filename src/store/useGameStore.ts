@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { saveStorage } from "../lib/saveStorage";
-import { unlockAchievement, submitWeekScore } from "../lib/desktop";
+import { unlockAchievement, submitDayScore } from "../lib/desktop";
 import type {
   DailySnapshot,
   DiscoveredRecipe,
@@ -582,6 +582,7 @@ export const useGameStore = create<GameState>()(
       ensureCurrentWeek: () => {
         const id = getCurrentWeekId();
         if (get().weekId === id) return;
+        if (id < get().weekId) return; // refuse backward clock jumps ("YYYY-Wnn" sorts)
         set({ weekId: id });
         get().startNewWeek();
       },
@@ -590,6 +591,10 @@ export const useGameStore = create<GameState>()(
         const id = getCurrentDateId();
         const s = get();
         if (s.dateId === id) return;
+        // Anti-cheat: "YYYY-MM-DD" sorts lexicographically, so the persisted
+        // dateId doubles as a monotonic guard. A backward clock jump would
+        // otherwise re-trigger rollover (trophy + Steam submit per flap).
+        if (id < s.dateId) return;
 
         // Finalize yesterday's daily-leaderboard placement into a trophy
         // before anything resets. Days with no play earn nothing.
@@ -599,7 +604,7 @@ export const useGameStore = create<GameState>()(
           const tier = trophyTierFor(placementFor(s.dailyCurry, rivals));
           if (tier) trophies = { ...trophies, [tier]: (trophies[tier] ?? 0) + 1 };
           // Record the finished day's total on Steam (no-op off-desktop).
-          submitWeekScore(s.dailyCurry);
+          submitDayScore(s.dailyCurry);
         }
 
         // A new real day is a full prestige reset: record the daily-stars
@@ -1174,7 +1179,19 @@ export const useGameStore = create<GameState>()(
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Record<string, unknown>;
         // Older saves stored these as Decimal strings; Number() covers both.
-        const num = (v: unknown) => Number(v ?? 0);
+        // Clamps are anti-cheat: hand-edited saves (Infinity, negatives,
+        // absurd totals) load as sane values instead of being trusted.
+        const num = (v: unknown, cap = 1e15) => {
+          const n = Number(v ?? 0);
+          return Number.isFinite(n) && n > 0 ? Math.min(n, cap) : 0;
+        };
+        const trophies = p.trophies
+          ? Object.fromEntries(
+              Object.entries(p.trophies as Record<string, unknown>).map(
+                ([k, v]) => [k, Math.floor(num(v, 10000))],
+              ),
+            )
+          : current.trophies;
         return {
           ...current,
           ...(p as object),
@@ -1183,9 +1200,11 @@ export const useGameStore = create<GameState>()(
           weekCurry: num(p.weekCurry),
           highScore: num(p.highScore),
           todayCurry: num(p.todayCurry),
-          dailyCurry: num(p.dailyCurry),
+          // A day's haul can't exceed the lifetime total.
+          dailyCurry: Math.min(num(p.dailyCurry), num(p.totalCurryAllTime)),
+          trophies,
           dailySnapshots: ((p.dailySnapshots as DailySnapshot[]) ?? []).map(
-            (snap) => ({ ...snap, curry: Number(snap.curry) }),
+            (snap) => ({ ...snap, curry: num(snap.curry) }),
           ),
         } as GameState;
       },

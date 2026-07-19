@@ -8,6 +8,7 @@ import { ArcadeButton } from "../components/arcade/ArcadeButton";
 import { ArcadePanel } from "../components/arcade/ArcadePanel";
 import { IS_DEMO } from "../target";
 import { SteamCta } from "../components/SteamCta";
+import { desktop } from "../lib/desktop";
 
 interface Props {
   onNavigate: (s: Screen) => void;
@@ -54,8 +55,17 @@ export function SettingsScreen({ onNavigate }: Props) {
       ) {
         throw new Error("bad save");
       }
-      localStorage.setItem(SAVE_KEY, raw);
-      window.location.reload();
+      const d = desktop();
+      if (d) {
+        // Desktop persists via the IPC save file, not localStorage. The main
+        // process debounces writes by 1s, so wait past that before reloading
+        // or the fresh renderer would rehydrate from the old file.
+        await d.writeSave(raw);
+        window.setTimeout(() => window.location.reload(), 1500);
+      } else {
+        localStorage.setItem(SAVE_KEY, raw);
+        window.location.reload();
+      }
     } catch {
       setImportError("That file isn't a valid Curry Clicker save.");
     }
