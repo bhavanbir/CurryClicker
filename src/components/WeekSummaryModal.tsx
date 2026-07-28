@@ -89,11 +89,11 @@ export function WeekSummaryModal({ onNavigate }: Props) {
               className="mt-3 w-full"
               onClick={() => {
                 startNewWeek();
-                onNavigate("franchise");
+                onNavigate("skills");
               }}
             >
               <Icon name="stars" fill size={18} className="text-violet-700" />
-              Spend your stars
+              Spend your stars in the skill tree
             </ArcadeButton>
           </div>
         )}

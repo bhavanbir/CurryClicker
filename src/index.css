@@ -59,6 +59,15 @@
   --tertiary: 250 188 68;
   --flavor-spicy: 239 68 68;
   --glow: 255 140 0; /* crit / on-fire glow hue */
+  --flash: 255 243 214; /* warm scene flash */
+  /* Gacha rarity ladder — common reads as a muted stone on cream, then the
+     ladder climbs in saturation up to the chili-red Currylicious top. */
+  --rarity-common: 168 162 158;
+  --rarity-uncommon: 56 189 248;
+  --rarity-rare: 217 70 239;
+  --rarity-epic: 124 58 237; /* franchise violet */
+  --rarity-legendary: 245 158 11;
+  --rarity-curry: 255 45 32;
 }
 /* Dark = the light palette's warm cream/orange world in coffee tones: warm
    off-white ink, elevated brown panels, and shadows that stay dark (shadows
@@ -85,6 +94,13 @@
   --tertiary: 192 152 80;
   --flavor-spicy: 196 100 88;
   --glow: 196 130 62;
+  --flash: 92 62 30;
+  --rarity-common: 138 130 122;
+  --rarity-uncommon: 108 168 196;
+  --rarity-rare: 186 108 190;
+  --rarity-epic: 140 112 208;
+  --rarity-legendary: 204 156 74;
+  --rarity-curry: 214 88 72;
 }
 
 html,
@@ -169,22 +185,18 @@ body {
       6px 6px 0 0 rgb(var(--shadow));
   }
 
-  /* Shop drawer surface + awning — market-stall stripes so the store reads
-     as its own space, not another game panel */
-  .shop-surface {
-    background-color: #ffdcc3;
-    background-image: repeating-linear-gradient(
-      135deg,
-      rgba(255, 140, 0, 0.08) 0 12px,
-      transparent 12px 24px
+  /* Currylicious surface — a sheen that scrolls across a chili/curry gradient.
+     One element, background-position only: no transforms, no overlay layer. */
+  .rarity-curry-surface {
+    background-image: linear-gradient(
+      100deg,
+      rgb(var(--rarity-curry)),
+      rgb(var(--curry-yellow)),
+      #fff,
+      rgb(var(--rarity-curry))
     );
-  }
-  .shop-awning {
-    background: repeating-linear-gradient(90deg, #ff8c00 0 22px, rgb(var(--cream)) 22px 44px);
-  }
-  /* Dark market stall: deep wood instead of peach, same stripe overlay */
-  .dark .shop-surface {
-    background-color: #3d2b12;
+    background-size: 300% 100%;
+    animation: curry-sheen 2.4s linear infinite;
   }
 
   /* Interactive control: lifts on hover, presses down on active */
@@ -237,6 +249,17 @@ body {
   scrollbar-width: none;
 }
 
+/* Drives .rarity-curry-surface (in @layer components — keyframes stay out of
+   the layer so Tailwind never purges them with the class). */
+@keyframes curry-sheen {
+  from {
+    background-position: 0% 50%;
+  }
+  to {
+    background-position: -300% 50%;
+  }
+}
+
 /* Click FX — spice burst at the cursor (compositor-only CSS, cheap at 10 cps) */
 @keyframes spice-burst {
   to {
@@ -247,18 +270,59 @@ body {
 .spice-particle {
   animation: spice-burst 0.45s ease-out forwards;
 }
+/* Explosion confetti: hard fling, tumble, hang, then fade — vs the quick puff
+   above. --dx/--dy set the landing spot, --rot the tumble, --dur the flight. */
+@keyframes spice-burst-big {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(1);
+    opacity: 1;
+  }
+  65% {
+    transform: translate(calc(var(--dx) * 0.85), calc(var(--dy) * 0.85))
+      rotate(calc(var(--rot, 360deg) * 0.8)) scale(0.9);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--dx), var(--dy)) rotate(var(--rot, 360deg)) scale(0.2);
+    opacity: 0;
+  }
+}
+.spice-particle-big {
+  animation: spice-burst-big var(--dur, 0.9s) cubic-bezier(0.15, 0.75, 0.25, 1)
+    var(--delay, 0s) both;
+}
+/* White-hot core flash at the impact point. */
+@keyframes burst-core {
+  0% {
+    transform: translate(-50%, -50%) scale(0.2);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(var(--core-scale, 3));
+    opacity: 0;
+  }
+}
+.burst-core {
+  animation: burst-core 0.4s cubic-bezier(0.1, 0.8, 0.2, 1) forwards;
+}
 @keyframes spice-ring {
   from {
     transform: translate(-50%, -50%) scale(0.3);
     opacity: 0.8;
   }
   to {
-    transform: translate(-50%, -50%) scale(1.6);
+    transform: translate(-50%, -50%) scale(var(--ring-scale, 1.6));
     opacity: 0;
   }
 }
 .spice-ring {
   animation: spice-ring 0.35s ease-out forwards;
+}
+/* Same ring, shockwave read: slower, wider, and eased so it snaps out then
+   coasts. Callers can still override --ring-scale per burst. */
+.spice-shock {
+  --ring-scale: 3;
+  animation: spice-ring 0.55s cubic-bezier(0.1, 0.75, 0.2, 1) forwards;
 }
 /* Pop in with overshoot (never linear — reads dead), then rise and fade. */
 @keyframes float-rise {
@@ -287,24 +351,18 @@ body {
   animation-duration: 1.1s;
 }
 /* Payoff juice — scene shake (big moments only) + On Fire glow + crit telegraph */
-@keyframes shake-sm {
+/* One shake, scaled by the caller: set --shake-mag (px) and optionally
+   --shake-dur inline. Offsets are fractions of the magnitude. */
+@keyframes shake-var {
   0%, 100% { transform: translate(0, 0); }
-  25% { transform: translate(3px, -2px); }
-  50% { transform: translate(-3px, 2px); }
-  75% { transform: translate(2px, 3px); }
+  20% { transform: translate(calc(var(--shake-mag) * 1), calc(var(--shake-mag) * -0.7)); }
+  40% { transform: translate(calc(var(--shake-mag) * -0.85), calc(var(--shake-mag) * 0.7)); }
+  60% { transform: translate(calc(var(--shake-mag) * 0.7), calc(var(--shake-mag) * 0.85)); }
+  80% { transform: translate(calc(var(--shake-mag) * -1), calc(var(--shake-mag) * -0.55)); }
 }
-@keyframes shake-lg {
-  0%, 100% { transform: translate(0, 0); }
-  20% { transform: translate(7px, -5px); }
-  40% { transform: translate(-6px, 5px); }
-  60% { transform: translate(5px, 6px); }
-  80% { transform: translate(-7px, -4px); }
-}
-.shake-sm {
-  animation: shake-sm 0.3s ease-out;
-}
-.shake-lg {
-  animation: shake-lg 0.4s ease-out;
+.shake {
+  --shake-mag: 4px;
+  animation: shake-var var(--shake-dur, 0.34s) ease-out;
 }
 /* Warm full-scene flash for jackpot crits — brief, then back to rest */
 @keyframes scene-flash {
@@ -316,6 +374,7 @@ body {
   }
 }
 .scene-flash {
+  background-color: rgb(var(--flash));
   animation: scene-flash 0.3s ease-out forwards;
 }
 @keyframes on-fire-glow {
@@ -345,16 +404,23 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .spice-particle,
+  .spice-particle-big,
   .spice-ring,
+  .spice-shock,
+  .burst-core,
   .float-rise {
     animation: none;
     opacity: 0;
   }
-  .shake-sm,
-  .shake-lg,
+  .shake,
   .on-fire-glow,
   .scene-flash {
     animation: none;
+  }
+  /* Currylicious keeps its gradient, loses the scroll */
+  .rarity-curry-surface {
+    animation: none;
+    background-position: 0% 50%;
   }
   /* keep the telegraph visible as a static ring — it's a gameplay cue */
   .crit-telegraph {

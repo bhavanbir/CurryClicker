@@ -21,7 +21,8 @@ interface Opts {
   /** Fired when a diner finishes eating (not when kicked out at close). */
   onFed?: () => void;
   expansionLevel: number;
-  cravingMatched: boolean;
+  /** Kitchen is On Fire — diners react with the delighted mood set. */
+  delighted: boolean;
 }
 
 export function useCustomerDirector({
@@ -30,7 +31,7 @@ export function useCustomerDirector({
   consumeDish,
   onFed,
   expansionLevel,
-  cravingMatched,
+  delighted,
 }: Opts): CustomerView[] {
   const [customers, setCustomers] = useState<CustomerView[]>([]);
   const reduced = useReducedMotion() ?? false;
@@ -47,8 +48,8 @@ export function useCustomerDirector({
   consumeRef.current = consumeDish;
   const onFedRef = useRef(onFed);
   onFedRef.current = onFed;
-  const matchedRef = useRef(cravingMatched);
-  matchedRef.current = cravingMatched;
+  const delightedRef = useRef(delighted);
+  delightedRef.current = delighted;
 
   const timers = useRef<number[]>([]);
   const idRef = useRef(0);
@@ -78,13 +79,13 @@ export function useCustomerDirector({
 
       const id = idRef.current++;
       // Snapshot at spawn: this diner reacts to the dish as served, even if the
-      // player re-slots the recipe mid-visit.
-      const cravingMatched = matchedRef.current;
+      // kitchen cools off mid-visit.
+      const delighted = delightedRef.current;
       // Cosmetic roll: ~1 in 10 diners are expressive and emote above their head.
       const expressive = Math.random() < 0.1;
       setCustomers((list) => [
         ...list,
-        { id, seat, state: "entering", reduced, cravingMatched, expressive },
+        { id, seat, state: "entering", reduced, delighted, expressive },
       ]);
 
       const setState = (state: CustomerView["state"]) =>

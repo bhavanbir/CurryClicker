@@ -1,6 +1,6 @@
 // Restaurant scene skins — the colour palette for the wall + floor. Wired into
-// SceneBackdrop via its `skin` prop and selectable in the scene's Decorate
-// panel (Phase 4). Free/cosmetic; the real-money skin store is a later phase.
+// SceneBackdrop via its `skin` prop and selectable in Settings → Game.
+// Free/cosmetic; the real-money skin store is a later phase.
 
 import type { SceneSkin } from "../types";
 

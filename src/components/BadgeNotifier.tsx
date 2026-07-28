@@ -8,7 +8,7 @@ import { Icon } from "./arcade/Icon";
 // Bottom-right toast when a badge unlocks live (badges were previously silent
 // in-app; the Steam achievement popup still fires separately from the store).
 // Primed on mount so a returning player's existing badges never flood.
-// Structural copy of ShopNotifier; stacked above it (bottom-44 vs bottom-24).
+// Toast pinned to the bottom-right corner (bottom-44).
 
 interface Toast {
   id: string;

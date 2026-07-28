@@ -20,7 +20,8 @@ function multFor(stage: 0 | 1 | 2): number {
   return stage === 2 ? 1.5 : stage === 1 ? 1.25 : 1;
 }
 
-export function useOnFire() {
+/** @param gainMult heat gained per cook, scaled by fire_gain effects. */
+export function useOnFire(gainMult = 1) {
   const [heat, setHeat] = useState(0);
   const heatRef = useRef(0);
   const lastCookAtRef = useRef(0);
@@ -53,7 +54,7 @@ export function useOnFire() {
   function registerCook(): number {
     const now = Date.now();
     decayTo(now);
-    heatRef.current = Math.min(100, heatRef.current + HEAT_PER_COOK);
+    heatRef.current = Math.min(100, heatRef.current + HEAT_PER_COOK * gainMult);
     lastCookAtRef.current = now;
     setHeat(heatRef.current);
     return multFor(stageFor(heatRef.current));

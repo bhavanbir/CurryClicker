@@ -2,7 +2,8 @@ import { useGameStore } from "../store/useGameStore";
 import { formatCurry } from "../lib/format";
 import { BADGES } from "../engine/badges";
 import { TROPHY_TIERS } from "../engine/dailyRivals";
-import { franchiseRankFor } from "../engine/franchiseData";
+import { franchiseRankFor } from "../engine/skillTree";
+import { DAYS_PER_WEEK } from "../config";
 import type { Screen } from "../navigation";
 import { Icon } from "../components/arcade/Icon";
 import { PageHeader } from "../components/arcade/PageHeader";
@@ -23,7 +24,10 @@ export function ProfileScreen({ onNavigate }: Props) {
   const clicksThisWeek = useGameStore((s) => s.clicksThisWeek);
   const currentDay = useGameStore((s) => s.currentDay);
   const unlockedBadges = useGameStore((s) => s.unlockedBadges);
-  const recipesFound = useGameStore((s) => Object.keys(s.discoveredRecipes).length);
+  const ingredientsCollected = useGameStore(
+    (s) => new Set(s.gachaInventory.map((r) => r.ingredientId)).size,
+  );
+  const totalSpins = useGameStore((s) => s.totalSpins);
   const franchiseStarsEarned = useGameStore((s) => s.franchiseStarsEarned);
   const bestFranchiseStars = useGameStore((s) => s.bestFranchiseStars);
   const trophies = useGameStore((s) => s.trophies);
@@ -53,8 +57,13 @@ export function ProfileScreen({ onNavigate }: Props) {
         </ArcadePanel>
         <Stat icon="military_tech" value={formatCurry(highScore, 1)} label="High Score" />
         <Stat icon="touch_app" value={clicksThisWeek.toLocaleString()} label="Cooks / Week" />
-        <Stat icon="calendar_today" value={`${currentDay}/7`} label="Current Day" />
-        <Stat icon="restaurant_menu" value={recipesFound.toString()} label="Recipes Found" />
+        <Stat icon="calendar_today" value={`${currentDay}/${DAYS_PER_WEEK}`} label="Current Day" />
+        <Stat
+          icon="inventory_2"
+          value={ingredientsCollected.toString()}
+          label="Ingredients Collected"
+        />
+        <Stat icon="casino" value={totalSpins.toLocaleString()} label="Total Spins" />
         <Stat
           icon="stars"
           value={franchiseStarsEarned.toLocaleString()}
@@ -72,10 +81,10 @@ export function ProfileScreen({ onNavigate }: Props) {
         <ArcadeButton
           className="h-full justify-center"
           size="lg"
-          onClick={() => onNavigate("franchise")}
+          onClick={() => onNavigate("skills")}
         >
-          <Icon name="stars" fill size={22} className="text-violet-600" />
-          Franchise HQ
+          <Icon name="account_tree" fill size={22} className="text-violet-600" />
+          Skill Tree
           <Icon name="arrow_forward" size={20} />
         </ArcadeButton>
       </section>

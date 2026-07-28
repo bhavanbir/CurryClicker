@@ -8,21 +8,14 @@ const FILES = import.meta.glob("../assets/icons/*.png", {
   import: "default",
 }) as Record<string, string>;
 
-// Game id → sprite filename where they differ. Decorations use their deco_
-// shop-tile variant so they read well at UI sizes.
+// Game id → sprite filename where they differ.
 const ALIAS: Record<string, string> = {
-  slot_4: "recipe_slot_4",
-  slot_5: "recipe_slot_5",
   expand_1: "cozy_extension",
   expand_2: "extra_seating",
   expand_3: "dining_hall",
   expand_4: "grand_floor",
   expand_5: "curry_emporium",
   delivery_fleet: "delivery_van",
-  spatula: "deco_golden_spatula",
-  potted_tulsi: "deco_tulsi",
-  elephant_statue: "deco_elephant",
-  rooftop_garden: "deco_herb_garden",
 };
 
 export const UI_SPRITES: Record<string, string> = {};
@@ -31,7 +24,7 @@ for (const [path, url] of Object.entries(FILES)) {
 }
 
 export function spriteFor(id: string): string | undefined {
-  return UI_SPRITES[ALIAS[id] ?? id] ?? UI_SPRITES[`deco_${ALIAS[id] ?? id}`];
+  return UI_SPRITES[ALIAS[id] ?? id];
 }
 
 export function PixelIcon({
@@ -41,7 +34,7 @@ export function PixelIcon({
   className = "",
   iconClassName = "",
 }: {
-  id: string; // game id (upgrade/decoration/ingredient)
+  id: string; // game id (ingredient/skill node)
   icon: string; // Material Symbols fallback ligature
   size: number;
   className?: string;

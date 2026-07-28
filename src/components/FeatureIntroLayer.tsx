@@ -27,56 +27,43 @@ interface IntroDef {
 
 const INTROS: IntroDef[] = [
   {
-    id: "shop",
-    badge: "Day 3 — The Shop opens",
-    cta: "Show me the goods!",
-    day: FEATURE_UNLOCK_DAY.shop,
+    id: "gacha",
+    badge: "Day 2 — The Gacha opens",
+    cta: "Let's roll!",
+    day: FEATURE_UNLOCK_DAY.gacha,
     rows: [
       {
-        icon: "storefront",
-        title: "Upgrades",
-        body: "Spend curry on ladles, knives and helpers — every cook is worth more. There's a new Shop tab, plus a goal bar tracking your next buy.",
+        icon: "casino",
+        title: "Roll for ingredients",
+        body: "Spend curry on a spin. Every roll is unique — rarity sets how many bonuses it carries, and each bonus lands somewhere in its range.",
       },
       {
-        icon: "chair",
-        title: "Decorations",
-        body: "Decor earns curry on its own, even while you rest. Press Decorate on the scene to arrange your restaurant however you like.",
+        icon: "inventory_2",
+        title: "Equip three",
+        body: "Your inventory keeps every roll, but only three can be equipped at once. Their bonuses stack onto every cook.",
+      },
+      {
+        icon: "auto_awesome",
+        title: "Chase Currylicious",
+        body: "Six rarities, from Common up to Currylicious — the top tier carries six bonuses and almost never drops.",
       },
     ],
   },
   {
-    id: "craving",
-    badge: "Day 4 — Town Craving",
-    cta: "I'll cook what they crave!",
-    day: FEATURE_UNLOCK_DAY.craving,
+    id: "skills",
+    badge: "Day 3 — Skill Tree",
+    cta: "Show me the tree!",
+    day: FEATURE_UNLOCK_DAY.skills,
     rows: [
       {
-        icon: "restaurant",
-        title: "The town craves a flavor",
-        body: "Each day the town wants one flavor — Spicy, Mild, Sweet, Savory or Unique. Match it and every cook earns ×1.35.",
+        icon: "account_tree",
+        title: "Three curry branches",
+        body: "Spice, Service and Hustle buy with curry — click power, crits and room, economy. They all reset when the week prestiges.",
       },
       {
-        icon: "whatshot",
-        title: "Cooking to a flavor",
-        body: "A recipe takes its most-used ingredient flavor: stack Spicy ingredients for a Spicy dish. A tie comes out Unique.",
-      },
-    ],
-  },
-  {
-    id: "special",
-    badge: "Day 5 — Chef's Special",
-    cta: "Chef, yes chef!",
-    day: FEATURE_UNLOCK_DAY.special,
-    rows: [
-      {
-        icon: "star",
-        title: "Today's featured pair",
-        body: "Every day two ingredients are the Chef's Special. Cook with both in your recipe to claim a ×2 bonus for the day.",
-      },
-      {
-        icon: "left_panel_open",
-        title: "Where it lives",
-        body: "Look for the star tab on the left edge of the scene — peek at today's pair and Mix It In with one tap.",
+        icon: "stars",
+        title: "The star branch is permanent",
+        body: "Stars from your week report buy the meta branch. Those nodes stay bought through every prestige.",
       },
     ],
   },
@@ -89,17 +76,17 @@ const INTROS: IntroDef[] = [
       {
         icon: "autorenew",
         title: "Weekly reset",
-        body: "Your Shop upgrades reset with the new week — re-buy them; each completed week they come back stronger (and pricier). And remember: the affinity matrix reshuffles every real-life day.",
+        body: "Your curry skill branches reset with the new week — re-buy them; each completed week they come back stronger (and pricier).",
       },
       {
         icon: "stars",
         title: "Franchise Stars",
-        body: "Stars from your week report buy permanent perks in the Franchise shop — new ingredients, head-start curry and more. Find it in your Chef profile.",
+        body: "Stars from your week report buy the permanent star branch — global multipliers, head-start curry and more. Find it on the Skills tab.",
       },
       {
         icon: "emoji_events",
         title: "What carries over",
-        body: "Decorations, badges and records stay yours. Chase a better week every week!",
+        body: "Your rolled ingredients, badges and records stay yours. Chase a better week every week!",
       },
     ],
   },

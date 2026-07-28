@@ -3,31 +3,28 @@ import { Sprite } from "./Sprite";
 import { SceneBackdrop } from "./SceneBackdrop";
 import { Counter, COUNTER_CAPACITY } from "./Counter";
 import { Customer } from "./Customer";
-import { DecorationLayer } from "./DecorationLayer";
-import { SceneEditor } from "./SceneEditor";
 import { project, projectWall, type Projected } from "./projection";
 import { PIXEL_SCALE, PROP, FIXTURE, type SpriteAnim } from "./manifest";
 import { tablesForLevel, PLANTS, DOOR, WINDOWS, FIXTURES, FLOOR_FIXTURES } from "./layout";
 import { WindowView } from "./WindowView";
 import { useCustomerDirector } from "../hooks/useCustomerDirector";
-import { useEffects } from "../hooks/useRecipeScore";
+import { useEffects } from "../hooks/useEffects";
 import { useGameStore } from "../store/useGameStore";
-import { Icon } from "../components/arcade/Icon";
 
 // POV-from-above-the-counter restaurant diorama. We look down over the counter
 // (foreground) out into the perspective-projected dining room. Clicking cooks
 // (unchanged contract); each cook drops a curry dish onto the counter.
 //
-// Phase 2: customers walk in, take a seat, eat a dish off the counter (freeing a
-// slot), and leave — a living loop driven by useCustomerDirector.
-// Phase 3: "Decorate" mode lets the player place owned decorations on the floor.
-// Phase 4: the active skin recolours the room; customers show mood faces.
+// Customers walk in, take a seat, eat a dish off the counter (freeing a slot),
+// and leave — a living loop driven by useCustomerDirector. The active skin
+// recolours the room; customers show mood faces, and turn delighted while the
+// kitchen is On Fire.
 
 interface Props {
   cookSignal: number; // increments on every cook
   onCook: (x: number, y: number) => void;
-  busy?: boolean; // recipe ready -> scene is "open"
-  cravingMatched?: boolean; // active recipe matches today's craving
+  busy?: boolean; // day running -> scene is "open"
+  onFire?: boolean; // kitchen at On Fire stage -> diners get extra happy
   onDinerFed?: () => void; // a diner finished eating (tip hook)
 }
 
@@ -54,7 +51,7 @@ export function RestaurantScene({
   cookSignal,
   onCook,
   busy = true,
-  cravingMatched = false,
+  onFire = false,
   onDinerFed,
 }: Props) {
   const activeSkin = useGameStore((s) => s.activeSkin);
@@ -63,12 +60,8 @@ export function RestaurantScene({
   // dark chrome (the scene-frame already flips to neon), so the room follows.
   // The picked skin still applies in light mode.
   const skin = darkMode ? "neon" : activeSkin;
-  const placements = useGameStore((s) => s.decorationPlacements);
-  const removePlacement = useGameStore((s) => s.removePlacement);
   const { expansionLevel } = useEffects();
   const tables = tablesForLevel(expansionLevel);
-
-  const [editing, setEditing] = useState(false);
 
   // Curry piled on the counter: cooking fills it; diners drain it.
   const [filled, setFilled] = useState(0);
@@ -78,12 +71,12 @@ export function RestaurantScene({
   }, [cookSignal]);
 
   const customers = useCustomerDirector({
-    open: busy && !editing,
+    open: busy,
     dishesAvailable: filled,
     consumeDish: () => setFilled((f) => Math.max(0, f - 1)),
     onFed: onDinerFed,
     expansionLevel,
-    cravingMatched,
+    delighted: onFire,
   });
 
   return (
@@ -91,13 +84,12 @@ export function RestaurantScene({
       role="button"
       tabIndex={0}
       onPointerDown={(e) => {
-        if (editing) return; // taps configure the room, not cook
         const rect = e.currentTarget.getBoundingClientRect();
         onCook(e.clientX - rect.left, e.clientY - rect.top);
       }}
-      /* `isolate` confines the scene's large internal z-indexes (counter/sign/
-         editor use 2000–4000) to their own stacking context, so they never
-         paint over page-level modals like the onboarding/week-summary overlays. */
+      /* `isolate` confines the scene's large internal z-indexes (counter/sign
+         use 2000–4000) to their own stacking context, so they never paint over
+         page-level modals like the onboarding/week-summary overlays. */
       /* Height tracks the viewport so the diorama dominates at any resolution:
          never below 240px (playable on tiny phones), capped at 560px (sprites
          are fixed-pixel; a huge room reads empty). */
@@ -109,18 +101,6 @@ export function RestaurantScene({
       <div className="pointer-events-none absolute left-1/2 top-2 z-[2500] -translate-x-1/2 rounded-full border-2 border-ink bg-curry-yellow px-3 py-0.5 text-[10px] font-black uppercase tracking-widest text-ink shadow-arcade-sm">
         {busy ? "Open" : "Closed"}
       </div>
-
-      {/* Decorate toggle */}
-      {!editing && (
-        <button
-          type="button"
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={() => setEditing(true)}
-          className="absolute right-2 top-2 z-[2500] flex items-center gap-1 rounded-full border-2 border-ink bg-white px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-ink shadow-arcade-sm hover:bg-cream-100"
-        >
-          <Icon name="brush" size={14} /> Decorate
-        </button>
-      )}
 
       {/* Back-wall structure */}
       <Placed p={projectWall(DOOR.u, DOOR.heightPct)} anim={PROP.door} />
@@ -146,9 +126,6 @@ export function RestaurantScene({
         <Placed key={i} p={project(t.u, t.v)} anim={PROP.table} />
       ))}
 
-      {/* Player-placed decorations */}
-      <DecorationLayer placements={placements} editing={editing} onPick={removePlacement} />
-
       {/* Diners */}
       {customers.map((c) => (
         <Customer key={c.id} c={c} />
@@ -156,9 +133,6 @@ export function RestaurantScene({
 
       {/* Foreground counter, piling up with cooked curry */}
       <Counter count={filled} skin={skin} />
-
-      {/* Decorate-mode overlay (tray, grid targets, skin picker) */}
-      {editing && <SceneEditor onClose={() => setEditing(false)} />}
     </div>
   );
 }

@@ -2,66 +2,68 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { saveStorage } from "../lib/saveStorage";
 import { unlockAchievement, submitDayScore } from "../lib/desktop";
-import type {
-  DailySnapshot,
-  DiscoveredRecipe,
-  Placement,
-  RecipeTier,
-  SceneSkin,
-  WeekStarAward,
-} from "../types";
+import type { DailySnapshot, SceneSkin, WeekStarAward } from "../types";
 import {
   getCurrentWeekId,
   getCurrentDateId,
   seedFromWeekId,
-  evaluateStreak,
-  getDailyCraving,
 } from "../engine/weekEngine";
 import { getDailyRivals, placementFor, trophyTierFor } from "../engine/dailyRivals";
 import { pickDayChoiceIds } from "../engine/dayChoices";
-import { COLLECTION_SET_MAP, setProgress } from "../engine/collections";
-import { getAffinityData, affinityPairKey } from "../engine/affinityEngine";
-import {
-  computeRecipeScore,
-  computeRecipeFlavor,
-  randomNeutralRecipe,
-  TIER_ORDER,
-} from "../engine/recipeEngine";
 import { computeEffects } from "../engine/effects";
-import { recipeFingerprint } from "../engine/cookbook";
 import { evaluateBadges } from "../engine/badges";
 import {
-  UPGRADE_MAP,
-  DECORATION_MAP,
-  upgradeCost,
-  decorationCost,
-} from "../engine/shopData";
+  spin as rollSpin,
+  spinCost,
+  sanitizeRoll,
+  capInventory,
+  combineRoll,
+  demoCap,
+  nextRarity,
+  rollPower,
+  COMBINE_COST,
+  MAX_INVENTORY,
+  RARITIES,
+  RARITY_ORDER,
+  type GachaRarity,
+  type RolledIngredient,
+} from "../engine/gacha";
 import {
-  FRANCHISE_UPGRADE_MAP,
+  SKILL_NODES,
+  SKILL_MAP,
+  META_MAP,
+  nodeCost,
   headStartCurry,
-  journalInsightPairs,
-  unlockedIngredientIds,
-} from "../engine/franchiseData";
-import { makeRng } from "../lib/rng";
-import { WALL_PLACE_ORDER, WALL_SLOTS } from "../scene/walls";
-import { BASE_UNLOCKED_SLOTS, TASTE_COOKS_TO_REVEAL } from "../config";
-import { IS_DEMO, DEMO_DECORATIONS, DEMO_LOCKED_INGREDIENT_SET } from "../target";
+  type SkillNode as SkillNodeDef,
+} from "../engine/skillTree";
+import { bossMaxHp as bossHpFor } from "../engine/boss";
+import { IS_DEMO } from "../target";
+import { DAYS_PER_WEEK } from "../config";
 
 export const SAVE_KEY = "curry-clicker-save";
-export const SAVE_VERSION = 15;
+export const SAVE_VERSION = 16;
 
 // Guided first run, revealed one step at a time:
 //   start   → only the scene + Start button visible (spotlight on Start)
 //   cook    → day 1 runs; just mash — nav and side systems stay hidden
-//   tabs    → day 1 done; nav revealed, spotlight points at the Kitchen tab
-//   kitchen → day-2 recipe/affinity tutorial shown in the Kitchen
+//   tabs    → day 1 done; nav revealed, spotlight points at the Gacha tab
+//   gacha   → day-2 gacha tutorial shown on the Gacha screen
 //   week1   → rest of the guided week; features unlock one day at a time
 //   done    → full UI
-export type TutorialStep = "start" | "cook" | "tabs" | "kitchen" | "week1" | "done";
+export type TutorialStep = "start" | "cook" | "tabs" | "gacha" | "week1" | "done";
+
+const TUTORIAL_STEPS: TutorialStep[] = [
+  "start",
+  "cook",
+  "tabs",
+  "gacha",
+  "week1",
+  "done",
+];
 
 // Guided week: the in-game day each side system joins the game (with a
 // one-time intro card — see FeatureIntroLayer). Veterans skip all gates.
-export const FEATURE_UNLOCK_DAY = { shop: 3, craving: 4, special: 5 } as const;
+export const FEATURE_UNLOCK_DAY = { gacha: 2, skills: 3 } as const;
 export type UnlockFeature = keyof typeof FEATURE_UNLOCK_DAY;
 
 export function useFeatureUnlocked(f: UnlockFeature): boolean {
@@ -70,19 +72,40 @@ export function useFeatureUnlocked(f: UnlockFeature): boolean {
   );
 }
 
-// NOTE: MVP keeps a flat store. The framework's slice split
-// (player/recipe/week/shop/cosmetics) is the Phase-2 refactor target.
-
 export type GamePhase = "cooking" | "week_summary";
 
-export interface CookOutcome {
-  fingerprint: string;
-  isNewDiscovery: boolean;
-  needsNaming: boolean; // first great/legendary craft of this recipe
-  tastedPairs: number; // pairs newly revealed by this cook (taste-to-reveal)
-}
+// "none" = nothing pulled yet; otherwise the best rarity seen.
+export type BestRarity = GachaRarity | "none";
 
-const EMPTY_SLOTS: (string | null)[] = [null, null, null, null, null];
+export const MAX_EQUIPPED = 3;
+
+const rarityIndex = (r: BestRarity): number =>
+  r === "none" ? -1 : RARITY_ORDER[r];
+
+// Tree prereqs are OR, checked against the union of both owned layers: any one
+// owned neighbour opens a node, and an owned star gate survives the weekly wipe
+// so it stays a valid anchor for the nodes hanging off it.
+const unlocked = (
+  node: SkillNodeDef,
+  s: { skillNodes: string[]; metaNodes: string[] },
+): boolean =>
+  node.prereqs.length === 0 ||
+  node.prereqs.some(
+    (p) => s.skillNodes.includes(p) || s.metaNodes.includes(p),
+  );
+
+// Node ids grouped by curry branch — the "own a whole branch" badge check.
+// Only each arm's inner cluster (out to the first notable) counts: the full
+// radial branch runs past star gates and is not weekly-achievable.
+const BRANCH_NODE_IDS: string[][] = Object.values(
+  SKILL_NODES.filter((n) => n.r <= 250).reduce<Record<string, string[]>>(
+    (m, n) => {
+      (m[n.branch] ??= []).push(n.id);
+      return m;
+    },
+    {},
+  ),
+);
 
 export interface GameState {
   // --- player ---
@@ -107,45 +130,36 @@ export interface GameState {
   tutorialStep: TutorialStep; // guided first-run progress (see TutorialStep)
   introsSeen: string[]; // one-time feature intro cards already dismissed
 
-  // --- recipe ---
-  slots: (string | null)[];
+  // --- gacha ---
+  gachaInventory: RolledIngredient[]; // every roll held (capped at MAX_INVENTORY)
+  equippedUids: string[]; // ≤ MAX_EQUIPPED uids into gachaInventory
+  spinCount: number; // spins this week — drives the price curve
+  totalSpins: number; // lifetime spins (spin index)
+  epicPulls: number; // lifetime Epic-or-better pulls
+  bestRarityThisWeek: BestRarity; // drives the weekly Star awards
+  bestRarityEver: BestRarity; // lifetime record
 
-  // --- economy (Epic B) ---
-  ownedDecorations: Record<string, number>; // id -> quantity
-  purchasedUpgrades: string[]; // upgrade ids
-  unlockedSlots: number; // derived from recipe_slot_unlock upgrades
+  // --- skill tree ---
+  skillNodes: string[]; // curry nodes — wiped on weekly prestige
+  metaNodes: string[]; // star nodes — wiped only on the real-day reset
 
-  // --- rewards (Epic C) ---
-  specialClaimDays: number[]; // days the Chef's Special was claimed this week
-  recipeStreakDays: number;
-  recipeStreakMultiplier: number;
-  highestTierSeen: RecipeTier; // best tier reached this week (Discovery Moments)
-  discoveredRecipes: Record<string, DiscoveredRecipe>; // this week's cookbook
-  // Affinity Journal: pair-key (affinityPairKey) -> true affinity, filled in as
-  // recipes are cooked through day-end. Undefined = pair not yet tested. Weekly.
-  discoveredAffinities: Record<string, number>;
-  claimedSets: string[]; // collection sets claimed this week
   unlockedBadges: string[]; // cumulative, never un-earned
   weeksCompleted: number;
-  maxSlotsUsed: number; // most slots in a cooked recipe (Combo King)
 
   // --- franchise (prestige; resets every real calendar day) ---
   franchiseStars: number; // spendable Star balance
   franchiseStarsEarned: number; // Stars earned today; drives rank; wiped at midnight
   bestFranchiseStars: number; // most Stars earned in a single day; survives the daily reset
-  franchiseUpgrades: string[]; // owned franchise upgrade ids
-  cravingMatchDays: number; // days this week the day-end flavour matched the craving
   lastWeekStars: WeekStarAward | null; // Star breakdown for the last completed week
 
-  // --- scene (Phase 3/4) ---
-  decorationPlacements: Placement[]; // owned decorations placed on the floor
+  // --- scene ---
   activeSkin: SceneSkin; // selected restaurant backdrop
 
   // --- week ---
   phase: GamePhase;
   weekId: string;
   seed: number;
-  currentDay: number; // 1–7
+  currentDay: number; // 1–DAYS_PER_WEEK
   dayProgress: number; // 0.0–1.0 within the current day
   dayStarted: boolean; // false until the player presses Start Day — clock paused
   dayPaused: boolean; // mid-day pause; not persisted (a reload lands pre-day anyway)
@@ -158,6 +172,18 @@ export interface GameState {
   activeDayModifierId: string | null; // modifier applied to the current day
   usedDayModifierIds: string[]; // picked this week — excluded until the weekly reset
 
+  // --- day-DAYS_PER_WEEK boss ---
+  bossHp: number | null; // null = no fight in progress; 0 = beaten
+  bossMaxHp: number | null; // HP the fight started at (see engine/boss.ts)
+  // Post-mortem for a lost fight. Not persisted: the wipe itself is already
+  // committed, this is just the screen that explains it.
+  bossDefeat: {
+    score: number; // week curry, before the wipe
+    maxHp: number;
+    hpLeft: number;
+    kept: RolledIngredient | null; // the one roll that survived
+  } | null;
+
   // --- actions ---
   addCurry: (amount: number) => void;
   registerClick: () => void;
@@ -168,10 +194,6 @@ export interface GameState {
   setTutorialStep: (step: TutorialStep) => void;
   markIntroSeen: (id: string) => void;
   replayOnboarding: () => void;
-  toggleIngredient: (id: string) => void;
-  setIngredient: (slot: number, id: string | null) => void;
-  setRecipe: (ids: string[]) => void;
-  clearRecipe: () => void;
   advanceDayProgress: (frac: number) => void;
   startDay: () => void;
   togglePause: () => void;
@@ -182,84 +204,94 @@ export interface GameState {
   startNewWeek: () => void;
   hardReset: () => void;
 
+  // boss
+  damageBoss: (amount: number) => void;
+  resolveBossLoss: () => void;
+  dismissBossDefeat: () => void;
+
   // economy
   spendCurry: (amount: number) => void;
-  purchaseUpgrade: (id: string) => boolean;
-  purchaseDecoration: (id: string) => boolean;
-  buyFranchiseUpgrade: (id: string) => boolean;
-  recomputeDerived: () => void;
 
-  // rewards
-  noteTierSeen: (tier: RecipeTier) => boolean; // returns true if newly highest
-  claimSpecial: (day: number) => void;
-  logCook: (slots: (string | null)[]) => CookOutcome;
-  nameRecipe: (fingerprint: string, name: string) => void;
-  claimSet: (id: string) => void;
+  // gacha
+  spin: () => RolledIngredient | null; // null = can't afford
+  combine: (uids: string[]) => RolledIngredient | null; // null = invalid trade-up
+  equip: (uid: string) => void;
+  unequip: (uid: string) => void;
+  discardRoll: (uid: string) => void;
+
+  // skill tree
+  buySkillNode: (id: string) => boolean;
+  buyMetaNode: (id: string) => boolean;
+
   refreshBadges: () => void;
 
   // scene
-  placeDecoration: (decorationId: string, xPct: number, yPct: number) => boolean;
-  removePlacement: (instanceId: string) => void;
   setActiveSkin: (skin: SceneSkin) => void;
 }
 
 const initialWeekId = getCurrentWeekId();
 const initialDateId = getCurrentDateId();
 
-// Journal Insight (franchise): pre-reveal N affinity pairs, seeded so the same
-// pairs appear across reloads. Used at week start and at date reseed.
-function insightAffinities(
-  seed: number,
-  franchiseUpgrades: string[],
-): Record<string, number> {
-  const discoveredAffinities: Record<string, number> = {};
-  const insightPairs = journalInsightPairs(franchiseUpgrades);
-  if (insightPairs <= 0) return discoveredAffinities;
-  const { matrix } = getAffinityData(seed);
-  const ids = unlockedIngredientIds(franchiseUpgrades);
-  const rng = makeRng(`${seed}-insight`);
-  let attempts = 0;
-  while (
-    ids.length >= 2 &&
-    Object.keys(discoveredAffinities).length < insightPairs &&
-    attempts < 500
-  ) {
-    attempts++;
-    const a = ids[Math.floor(rng() * ids.length)];
-    const b = ids[Math.floor(rng() * ids.length)];
-    if (a === b) continue;
-    const key = affinityPairKey(a, b);
-    if (discoveredAffinities[key] !== undefined) continue;
-    discoveredAffinities[key] = matrix[a]?.[b] ?? 0;
-  }
-  return discoveredAffinities;
+// Lifetime rarity records for one new roll.
+function rarityRecords(
+  s: Pick<GameState, "bestRarityThisWeek" | "bestRarityEver" | "epicPulls">,
+  roll: RolledIngredient,
+) {
+  const i = RARITY_ORDER[roll.rarity];
+  return {
+    bestRarityThisWeek:
+      i > rarityIndex(s.bestRarityThisWeek) ? roll.rarity : s.bestRarityThisWeek,
+    bestRarityEver:
+      i > rarityIndex(s.bestRarityEver) ? roll.rarity : s.bestRarityEver,
+    epicPulls: s.epicPulls + (i >= RARITY_ORDER.epic ? 1 : 0),
+  };
 }
 
-// Active recipe tier for the current slots, including decoration spice bonus.
-function currentTier(s: GameState): RecipeTier {
-  const eff = computeEffects(
-    s.purchasedUpgrades,
-    s.ownedDecorations,
-    s.franchiseUpgrades,
-    s.weeksCompleted,
-  );
-  const { matrix } = getAffinityData(s.seed);
-  return computeRecipeScore(s.slots, matrix, {
-    spicePairBonus: eff.spicePairAffinityBonus,
-  }).tier;
-}
+const equippedRolls = (s: GameState): RolledIngredient[] =>
+  s.gachaInventory.filter((r) => s.equippedUids.includes(r.uid));
 
-// Default drop spot for a just-bought decoration: the first wall anchor with
-// nothing already sitting on it (players can move it anywhere afterwards).
-function nextFreeSpot(placements: Placement[]): { xPct: number; yPct: number } {
-  for (const i of WALL_PLACE_ORDER) {
-    const slot = WALL_SLOTS[i];
-    const taken = placements.some(
-      (p) => Math.abs(p.xPct - slot.xPct) < 3 && Math.abs(p.yPct - slot.yPct) < 3,
-    );
-    if (!taken) return { xPct: slot.xPct, yPct: slot.yPct };
+// Franchise Stars for a completed week, awarded exactly once at week end —
+// from the clock running out on the last day, or from the boss going down.
+// Six possible Stars: showing up, two earnings tiers, two gacha luck tiers,
+// one grind tier.
+function weekStars(
+  s: Pick<
+    GameState,
+    | "weekCurry"
+    | "clicksThisWeek"
+    | "bestRarityThisWeek"
+    | "franchiseStars"
+    | "franchiseStarsEarned"
+  >,
+): Pick<GameState, "franchiseStars" | "franchiseStarsEarned" | "lastWeekStars"> {
+  const reasons: string[] = ["Completed the week"];
+  let total = 1;
+  if (s.weekCurry >= 1_000_000) {
+    total += 1;
+    reasons.push("Earned 1M curry this week");
   }
-  return { xPct: 50, yPct: 40 }; // walls full — drop mid-room
+  if (s.weekCurry >= 100_000_000) {
+    total += 1;
+    reasons.push("Earned 100M curry this week");
+  }
+  const bestPull = rarityIndex(s.bestRarityThisWeek);
+  if (bestPull >= RARITY_ORDER.epic) {
+    total += 1;
+    reasons.push("Pulled an Epic ingredient");
+  }
+  if (bestPull >= RARITY_ORDER.legendary) {
+    total += 1;
+    reasons.push("Pulled a Legendary ingredient");
+  }
+  if (s.clicksThisWeek >= 2000) {
+    total += 1;
+    reasons.push("Cooked 2,000 times this week");
+  }
+  return {
+    franchiseStars: s.franchiseStars + total,
+    franchiseStarsEarned: s.franchiseStarsEarned + total,
+    lastWeekStars: { total, reasons },
+  };
 }
 
 export const useGameStore = create<GameState>()(
@@ -284,31 +316,25 @@ export const useGameStore = create<GameState>()(
       tutorialStep: "start",
       introsSeen: [],
 
-      slots: [...EMPTY_SLOTS],
+      gachaInventory: [],
+      equippedUids: [],
+      spinCount: 0,
+      totalSpins: 0,
+      epicPulls: 0,
+      bestRarityThisWeek: "none",
+      bestRarityEver: "none",
 
-      ownedDecorations: {},
-      purchasedUpgrades: [],
-      unlockedSlots: BASE_UNLOCKED_SLOTS,
+      skillNodes: [],
+      metaNodes: [],
 
-      specialClaimDays: [],
-      recipeStreakDays: 0,
-      recipeStreakMultiplier: 1,
-      highestTierSeen: "none",
-      discoveredRecipes: {},
-      discoveredAffinities: {},
-      claimedSets: [],
       unlockedBadges: [],
       weeksCompleted: 0,
-      maxSlotsUsed: 0,
 
       franchiseStars: 0,
       franchiseStarsEarned: 0,
       bestFranchiseStars: 0,
-      franchiseUpgrades: [],
-      cravingMatchDays: 0,
       lastWeekStars: null,
 
-      decorationPlacements: [],
       activeSkin: "default",
 
       phase: "cooking",
@@ -325,6 +351,10 @@ export const useGameStore = create<GameState>()(
       pendingDayChoices: null,
       activeDayModifierId: null,
       usedDayModifierIds: [],
+
+      bossHp: null,
+      bossMaxHp: null,
+      bossDefeat: null,
 
       addCurry: (amount) =>
         set((s) => {
@@ -359,49 +389,23 @@ export const useGameStore = create<GameState>()(
       replayOnboarding: () =>
         set({ hasOnboarded: false, tutorialStep: "start", introsSeen: [] }),
 
-      toggleIngredient: (id) => {
-        set((s) => {
-          const slots = [...s.slots];
-          const existing = slots.indexOf(id);
-          if (existing !== -1) {
-            slots[existing] = null;
-            return { slots };
-          }
-          const free = slots.findIndex(
-            (v, i) => v === null && i < s.unlockedSlots,
-          );
-          if (free === -1) return {}; // recipe full
-          slots[free] = id;
-          return { slots };
-        });
-        get().recomputeDerived();
-      },
+      advanceDayProgress: (frac) => {
+        const cur = get();
+        // Closing time on boss day with the boss still standing is a loss, not
+        // a week end — it takes over before any of the completion logic runs.
+        if (
+          cur.phase === "cooking" &&
+          cur.dayStarted &&
+          !cur.dayPaused &&
+          cur.dayProgress + frac >= 1 &&
+          cur.currentDay === DAYS_PER_WEEK &&
+          cur.bossHp !== null &&
+          cur.bossHp > 0
+        ) {
+          get().resolveBossLoss();
+          return;
+        }
 
-      setIngredient: (slot, id) => {
-        set((s) => {
-          if (slot < 0 || slot >= s.slots.length) return {};
-          const slots = [...s.slots];
-          slots[slot] = id;
-          return { slots };
-        });
-        get().recomputeDerived();
-      },
-
-      setRecipe: (ids) => {
-        set((s) => {
-          const slots = [...EMPTY_SLOTS];
-          ids.slice(0, s.unlockedSlots).forEach((id, i) => (slots[i] = id));
-          return { slots };
-        });
-        get().recomputeDerived();
-      },
-
-      clearRecipe: () => {
-        set({ slots: [...EMPTY_SLOTS] });
-        get().recomputeDerived();
-      },
-
-      advanceDayProgress: (frac) =>
         set((s) => {
           // Clock only runs while the day is open (player pressed Start Day)
           // and not paused.
@@ -414,11 +418,7 @@ export const useGameStore = create<GameState>()(
           let snapshots = s.dailySnapshots;
           let todayCurry = s.todayCurry;
           let todayClicks = s.todayClicks;
-          let streakDays = s.recipeStreakDays;
-          let streakMult = s.recipeStreakMultiplier;
           let weeksCompleted = s.weeksCompleted;
-          let discoveredAffinities = s.discoveredAffinities;
-          let cravingMatchDays = s.cravingMatchDays;
           let franchiseStars = s.franchiseStars;
           let franchiseStarsEarned = s.franchiseStarsEarned;
           let lastWeekStars = s.lastWeekStars;
@@ -426,49 +426,13 @@ export const useGameStore = create<GameState>()(
           let activeDayModifierId = s.activeDayModifierId;
           let tutorialStep = s.tutorialStep;
 
-          const tierAtDayEnd = currentTier(s);
-
           // Advance at most one day per pass: when the day ends we pause and wait
           // for the player to press Start Day again (no auto-rollover).
           if (dayProgress >= 1) {
             snapshots = [
               ...snapshots,
-              {
-                day: currentDay,
-                curry: todayCurry,
-                clicks: todayClicks,
-                tierAtDayEnd,
-              },
+              { day: currentDay, curry: todayCurry, clicks: todayClicks },
             ];
-
-            const streak = evaluateStreak({ tierAtDayEnd }, streakDays);
-            streakDays = streak.newStreakDays;
-            streakMult = streak.newMultiplier;
-
-            // Affinity Journal: reveal every pair in today's final recipe.
-            const cookedIds = s.slots.filter((x): x is string => x !== null);
-            if (cookedIds.length >= 2) {
-              const { matrix } = getAffinityData(s.seed);
-              let next = discoveredAffinities;
-              for (let i = 0; i < cookedIds.length; i++) {
-                for (let j = i + 1; j < cookedIds.length; j++) {
-                  const key = affinityPairKey(cookedIds[i], cookedIds[j]);
-                  if (next[key] === undefined) {
-                    if (next === discoveredAffinities) next = { ...discoveredAffinities };
-                    next[key] = matrix[cookedIds[i]]?.[cookedIds[j]] ?? 0;
-                  }
-                }
-              }
-              discoveredAffinities = next;
-            }
-
-            // Craving-match day: evaluate the day that is ENDING (currentDay is
-            // still the ending day here, before the increment below).
-            const endingCraving = getDailyCraving(currentDay, s.seed);
-            const endingFlavor = computeRecipeFlavor(s.slots);
-            if (endingFlavor !== null && endingFlavor === endingCraving) {
-              cravingMatchDays += 1;
-            }
 
             todayCurry = 0;
             todayClicks = 0;
@@ -478,45 +442,31 @@ export const useGameStore = create<GameState>()(
             // are offered below (never at week end — the week summary takes over).
             activeDayModifierId = null;
 
-            if (currentDay > 7) {
+            if (currentDay > DAYS_PER_WEEK) {
               phase = "week_summary";
-              currentDay = 7;
+              currentDay = DAYS_PER_WEEK;
               dayProgress = 1;
               weeksCompleted += 1;
 
-              // Award Franchise Stars exactly once, here at week completion
-              // (FRANCHISE_DESIGN.md). Inputs use the values just finalised
-              // above for the last day of the week.
-              const reasons: string[] = ["Completed the week"];
-              let total = 1;
-              if (TIER_ORDER[s.highestTierSeen] >= TIER_ORDER.great) {
-                total += 1;
-                reasons.push("Reached a Great recipe");
-              }
-              if (s.highestTierSeen === "legendary") {
-                total += 1;
-                reasons.push("Reached a Legendary recipe");
-              }
-              if (cravingMatchDays >= 4) {
-                total += 1;
-                reasons.push("Matched the craving on 4+ days");
-              }
-              if (Object.keys(discoveredAffinities).length >= 20) {
-                total += 1;
-                reasons.push("Discovered 20+ affinity pairs");
-              }
-              franchiseStars += total;
-              franchiseStarsEarned += total;
-              lastWeekStars = { total, reasons };
+              const stars = weekStars(s);
+              franchiseStars = stars.franchiseStars;
+              franchiseStarsEarned = stars.franchiseStarsEarned;
+              lastWeekStars = stars.lastWeekStars;
 
               // Demo has no prestige loop to explain — the guided week ends
               // here (full game shows the prestige intro instead).
               if (IS_DEMO && tutorialStep !== "done") tutorialStep = "done";
             } else {
               dayProgress = 0; // hold at the start of the next day
-              // Modifiers picked earlier this week don't come back around.
+              // Modifiers picked earlier this week don't come back around, and
+              // the boss day never takes one — you face it as you are.
               const ids = pickDayChoiceIds(s.seed, currentDay, s.usedDayModifierIds);
-              pendingDayChoices = ids.length > 0 ? ids : null;
+              pendingDayChoices =
+                currentDay === DAYS_PER_WEEK
+                  ? null
+                  : ids.length > 0
+                    ? ids
+                    : null;
             }
 
             // Tutorial: the first day ending flows into the tab tour — skip
@@ -539,16 +489,13 @@ export const useGameStore = create<GameState>()(
             pendingDayChoices,
             activeDayModifierId,
             tutorialStep,
-            recipeStreakDays: streakDays,
-            recipeStreakMultiplier: streakMult,
             weeksCompleted,
-            discoveredAffinities,
-            cravingMatchDays,
             franchiseStars,
             franchiseStarsEarned,
             lastWeekStars,
           };
-        }),
+        });
+      },
 
       startDay: () => {
         const s = get();
@@ -559,16 +506,34 @@ export const useGameStore = create<GameState>()(
         )
           return;
         if (s.tutorialStep === "start") {
-          // First run: drop in a starter recipe so the very first tap already
-          // cooks — no Kitchen detour before the first win.
-          if (s.slots.every((x) => x === null)) {
-            const ids = unlockedIngredientIds(s.franchiseUpgrades).filter(
-              (id) => !IS_DEMO || !DEMO_LOCKED_INGREDIENT_SET.has(id),
-            );
-            const { matrix } = getAffinityData(s.seed);
-            get().setRecipe(randomNeutralRecipe(ids, s.unlockedSlots, matrix));
+          // First run: hand out one free roll so the very first tap already
+          // cooks with an equipped ingredient — no Gacha detour before the
+          // first win. Whatever rarity it lands on is kept (a lucky freebie
+          // is a nice surprise, not a balance problem at spin 0).
+          if (s.gachaInventory.length === 0) {
+            const roll = rollSpin(s.totalSpins, 0);
+            set((st) => ({
+              gachaInventory: [roll],
+              equippedUids: [roll.uid],
+              totalSpins: st.totalSpins + 1,
+              ...rarityRecords(st, roll),
+            }));
           }
           set({ hasOnboarded: true, tutorialStep: "cook" });
+        }
+        // Boss day: lock the HP in from this week's pace. The null guard means
+        // a mid-fight reload resumes the same boss (dayStarted isn't persisted,
+        // so a reload always lands pre-day) instead of rerolling an easier one.
+        // Any modifier a legacy save carried in is cleared — no deals with the
+        // boss.
+        if (s.currentDay === DAYS_PER_WEEK && s.bossHp === null) {
+          const hp = bossHpFor(s.dailySnapshots);
+          set({
+            bossHp: hp,
+            bossMaxHp: hp,
+            activeDayModifierId: null,
+            pendingDayChoices: null,
+          });
         }
         set({ dayStarted: true, dayPaused: false });
       },
@@ -607,11 +572,11 @@ export const useGameStore = create<GameState>()(
           submitDayScore(s.dailyCurry);
         }
 
-        // A new real day is a full prestige reset: record the daily-stars
-        // record, wipe the franchise layer + curry + prestige level, then let
-        // startNewWeek reset all week-scoped state (upgrades, discoveries,
-        // streaks) against the new seed. Profile records (highScore, trophies,
-        // badges, bestFranchiseStars) and cosmetics survive.
+        // A new real day is a full reset: record the daily-stars record, wipe
+        // the star layer, the gacha collection and curry, then let
+        // startNewWeek reset all week-scoped state against the new seed.
+        // Profile records (highScore, trophies, badges, bestFranchiseStars,
+        // bestRarityEver, totalSpins, epicPulls) and cosmetics survive.
         set({
           dateId: id,
           seed: seedFromWeekId(id),
@@ -621,7 +586,11 @@ export const useGameStore = create<GameState>()(
           bestFranchiseStars: Math.max(s.bestFranchiseStars, s.franchiseStarsEarned),
           franchiseStars: 0,
           franchiseStarsEarned: 0,
-          franchiseUpgrades: [],
+          metaNodes: [],
+          gachaInventory: [],
+          equippedUids: [],
+          spinCount: 0,
+          bestRarityThisWeek: "none",
           lastWeekStars: null,
           currentCurry: 0,
           weeksCompleted: 0,
@@ -642,44 +611,33 @@ export const useGameStore = create<GameState>()(
         ),
 
       startNewWeek: () => {
-        const s = get();
-        const discoveredAffinities = insightAffinities(s.seed, s.franchiseUpgrades);
-
-        // Head Start (franchise): grant curry at the top of the week.
-        const headStart = headStartCurry(s.franchiseUpgrades);
-
-        set({
-          phase: "cooking",
+        set((s) => ({
+          phase: "cooking" as GamePhase,
           currentDay: 1,
           dayProgress: 0,
           dayStarted: false,
           dayPaused: false,
-          // Prestige: upgrades reset each week (re-buy at scaled prices with
-          // stronger ladles); decorations persist. The score starts over from
-          // zero (plus any franchise Head Start) — no bankroll carryover.
-          purchasedUpgrades: [],
-          currentCurry: headStart,
+          // Prestige: curry skill nodes reset each week (re-buy at scaled
+          // prices), the bankroll starts over at the meta Head Start.
+          skillNodes: [],
+          currentCurry: headStartCurry(s.metaNodes),
+          // BALANCE KNOB: gachaInventory + equippedUids deliberately SURVIVE
+          // weekly prestige. The collection is the thing you keep; only the
+          // spin price ladder resets. Wiping it here would make prestige feel
+          // like a punishment — change this first if prestige feels too easy.
+          spinCount: 0,
+          bestRarityThisWeek: "none" as BestRarity,
           weekCurry: 0,
           todayCurry: 0,
           todayClicks: 0,
           clicksThisWeek: 0,
           dailySnapshots: [],
-          // weekly reward state resets (the affinity matrix itself only
-          // reshuffles with the real calendar date — see ensureCurrentDate)
-          specialClaimDays: [],
-          recipeStreakDays: 0,
-          recipeStreakMultiplier: 1,
-          highestTierSeen: "none",
-          discoveredRecipes: {},
-          discoveredAffinities,
-          claimedSets: [],
-          maxSlotsUsed: 0,
-          cravingMatchDays: 0,
           pendingDayChoices: null,
           activeDayModifierId: null,
           usedDayModifierIds: [],
-        });
-        get().recomputeDerived();
+          bossHp: null,
+          bossMaxHp: null,
+        }));
         get().refreshBadges();
       },
 
@@ -698,27 +656,21 @@ export const useGameStore = create<GameState>()(
           hasOnboarded: true, // already a returning player; don't replay tutorial
           tutorialStep: "done",
           introsSeen: [],
-          slots: [...EMPTY_SLOTS],
-          ownedDecorations: {},
-          purchasedUpgrades: [],
-          unlockedSlots: BASE_UNLOCKED_SLOTS,
-          specialClaimDays: [],
-          recipeStreakDays: 0,
-          recipeStreakMultiplier: 1,
-          highestTierSeen: "none",
-          discoveredRecipes: {},
-          discoveredAffinities: {},
-          claimedSets: [],
+          gachaInventory: [],
+          equippedUids: [],
+          spinCount: 0,
+          totalSpins: 0,
+          epicPulls: 0,
+          bestRarityThisWeek: "none",
+          bestRarityEver: "none",
+          skillNodes: [],
+          metaNodes: [],
           unlockedBadges: [],
           weeksCompleted: 0,
-          maxSlotsUsed: 0,
           franchiseStars: 0,
           franchiseStarsEarned: 0,
           bestFranchiseStars: 0,
-          franchiseUpgrades: [],
-          cravingMatchDays: 0,
           lastWeekStars: null,
-          decorationPlacements: [],
           activeSkin: "default",
           phase: "cooking",
           weekId: id,
@@ -733,241 +685,200 @@ export const useGameStore = create<GameState>()(
           pendingDayChoices: null,
           activeDayModifierId: null,
           usedDayModifierIds: [],
+          bossHp: null,
+          bossMaxHp: null,
+          bossDefeat: null,
         });
       },
+
+      // --- boss ---
+
+      damageBoss: (amount) => {
+        const s = get();
+        if (s.phase !== "cooking" || s.bossHp === null || s.bossHp <= 0) return;
+        const hp = s.bossHp - amount;
+        if (hp > 0) {
+          set({ bossHp: hp });
+          return;
+        }
+        // Boss down. A win is just the week completing on schedule: same
+        // summary, same Stars, no bonus — beating it *is* the reward.
+        set((st) => ({
+          bossHp: 0,
+          phase: "week_summary" as GamePhase,
+          dayProgress: 1,
+          dayStarted: false,
+          dayPaused: false,
+          weeksCompleted: st.weeksCompleted + 1,
+          dailySnapshots: [
+            ...st.dailySnapshots,
+            { day: st.currentDay, curry: st.todayCurry, clicks: st.todayClicks },
+          ],
+          todayCurry: 0,
+          todayClicks: 0,
+          activeDayModifierId: null,
+          ...weekStars(st),
+          // Demo mirror of the timer path: the guided week ends here.
+          tutorialStep:
+            IS_DEMO && st.tutorialStep !== "done" ? "done" : st.tutorialStep,
+        }));
+        get().refreshBadges();
+      },
+
+      resolveBossLoss: () => {
+        const s = get();
+        // One roll walks out of the fire. Rolled and committed in the same
+        // synchronous pass so a reload can't re-roll a better survivor.
+        const kept =
+          s.gachaInventory.length > 0
+            ? s.gachaInventory[
+                Math.floor(Math.random() * s.gachaInventory.length)
+              ]
+            : null;
+        set({
+          bossDefeat: {
+            score: s.weekCurry,
+            maxHp: s.bossMaxHp ?? 0,
+            hpLeft: s.bossHp ?? 0,
+            kept,
+          },
+          bossHp: null,
+          bossMaxHp: null,
+          gachaInventory: kept ? [kept] : [],
+          equippedUids: kept ? [kept.uid] : [],
+          lastWeekStars: null,
+          // The features stay unlocked — losing shouldn't replay the tour.
+          tutorialStep: s.tutorialStep === "week1" ? "done" : s.tutorialStep,
+        });
+        // Wipes the skill nodes and the week's score, back to day 1. No Stars
+        // and no weeksCompleted bump: the week did not complete. Lifetime
+        // records (highScore, totalCurryAllTime, dailyCurry, franchiseStars,
+        // metaNodes) are untouched.
+        get().startNewWeek();
+      },
+
+      dismissBossDefeat: () => set({ bossDefeat: null }),
 
       // --- economy ---
 
       spendCurry: (amount) =>
         set((s) => ({ currentCurry: s.currentCurry - amount })),
 
-      purchaseUpgrade: (id) => {
+      // --- gacha ---
+
+      spin: () => {
         const s = get();
-        const up = UPGRADE_MAP[id];
-        if (!up) return false;
-        if (IS_DEMO && id === "slot_5") return false;
-        if (s.purchasedUpgrades.includes(id)) return false;
-        if (up.prerequisiteUpgradeId && !s.purchasedUpgrades.includes(up.prerequisiteUpgradeId)) {
-          return false;
-        }
-        const cost = upgradeCost(up, s.weeksCompleted);
-        if (s.currentCurry < cost) return false;
-
-        set((st) => ({
-          currentCurry: st.currentCurry - cost,
-          purchasedUpgrades: [...st.purchasedUpgrades, id],
-        }));
-        get().recomputeDerived();
-        get().refreshBadges();
-        return true;
-      },
-
-      purchaseDecoration: (id) => {
-        const s = get();
-        const deco = DECORATION_MAP[id];
-        if (!deco) return false;
-        if (IS_DEMO && !DEMO_DECORATIONS.includes(id)) return false;
-        const owned = s.ownedDecorations[id] ?? 0;
-        if (owned >= deco.maxQuantity) return false;
-        // Repeat copies cost more — prices keep pace with the bankroll.
-        const cost = decorationCost(deco, owned);
-        if (s.currentCurry < cost) return false;
-
-        set((st) => ({
-          currentCurry: st.currentCurry - cost,
-          ownedDecorations: { ...st.ownedDecorations, [id]: owned + 1 },
-        }));
-        // Auto-place it so the purchase immediately shows up in the scene. The
-        // player can still move it anywhere in Decorate mode.
-        const spot = nextFreeSpot(get().decorationPlacements);
-        set((st) => ({
-          decorationPlacements: [
-            ...st.decorationPlacements,
-            { instanceId: `${id}-${crypto.randomUUID()}`, decorationId: id, ...spot },
-          ],
-        }));
-        get().recomputeDerived();
-        return true;
-      },
-
-      buyFranchiseUpgrade: (id) => {
-        if (IS_DEMO) return false;
-        const s = get();
-        const up = FRANCHISE_UPGRADE_MAP[id];
-        if (!up) return false;
-        if (s.franchiseUpgrades.includes(id)) return false;
-        if (
-          up.prerequisiteUpgradeId &&
-          !s.franchiseUpgrades.includes(up.prerequisiteUpgradeId)
-        ) {
-          return false;
-        }
-        if (s.franchiseStars < up.cost) return false;
-
-        set((st) => ({
-          franchiseStars: st.franchiseStars - up.cost,
-          franchiseUpgrades: [...st.franchiseUpgrades, id],
-        }));
-        // Reputation and Fourth Burner feed computeEffects (global mult / base
-        // slots), so refresh derived economy values.
-        get().recomputeDerived();
-        return true;
-      },
-
-      placeDecoration: (decorationId, xPct, yPct) => {
-        // Non-finite coords would persist as null and pile the sprite into the
-        // scene's top-left corner (NaN survives the clamps below).
-        if (!Number.isFinite(xPct) || !Number.isFinite(yPct)) return false;
-        const s = get();
-        const owned = s.ownedDecorations[decorationId] ?? 0;
-        if (owned <= 0) return false;
-        // Can't place more instances than you own.
-        const placed = s.decorationPlacements.filter(
-          (p) => p.decorationId === decorationId,
-        ).length;
-        if (placed >= owned) return false;
-
-        const instanceId = `${decorationId}-${crypto.randomUUID()}`;
-        set((st) => ({
-          decorationPlacements: [
-            ...st.decorationPlacements,
-            {
-              instanceId,
-              decorationId,
-              // Keep drops inside the room, off the foreground counter.
-              xPct: Math.min(97, Math.max(3, xPct)),
-              yPct: Math.min(70, Math.max(10, yPct)),
-            },
-          ],
-        }));
-        return true;
-      },
-
-      removePlacement: (instanceId) =>
-        set((s) => ({
-          decorationPlacements: s.decorationPlacements.filter(
-            (p) => p.instanceId !== instanceId,
-          ),
-        })),
-
-      setActiveSkin: (skin) => set({ activeSkin: skin }),
-
-      recomputeDerived: () =>
-        set((s) => {
-          const eff = computeEffects(
-            s.purchasedUpgrades,
-            s.ownedDecorations,
-            s.franchiseUpgrades,
-            s.weeksCompleted,
-          );
-          return { unlockedSlots: eff.unlockedSlots };
-        }),
-
-      // --- rewards ---
-
-      noteTierSeen: (tier) => {
-        const s = get();
-        if (TIER_ORDER[tier] <= TIER_ORDER[s.highestTierSeen]) return false;
-        set({ highestTierSeen: tier });
-        get().refreshBadges();
-        return true;
-      },
-
-      claimSpecial: (day) => {
-        const s = get();
-        if (s.specialClaimDays.includes(day)) return;
-        set({ specialClaimDays: [...s.specialClaimDays, day] });
-        get().refreshBadges();
-      },
-
-      logCook: (slots) => {
-        const s = get();
-        const ids = slots.filter((x): x is string => x !== null);
-        const fingerprint = recipeFingerprint(slots);
         const eff = computeEffects(
-          s.purchasedUpgrades,
-          s.ownedDecorations,
-          s.franchiseUpgrades,
+          s.skillNodes,
+          s.metaNodes,
+          equippedRolls(s),
           s.weeksCompleted,
         );
-        const { matrix } = getAffinityData(s.seed);
-        const score = computeRecipeScore(slots, matrix, {
-          spicePairBonus: eff.spicePairAffinityBonus,
-        });
+        const cost = spinCost(s.spinCount, s.weeksCompleted, eff.spinCostMult);
+        if (s.currentCurry < cost) return null;
+        get().spendCurry(cost);
 
-        const existing = s.discoveredRecipes[fingerprint];
-        const isNewDiscovery = !existing && ids.length > 0;
-        const isHighTier = score.tier === "great" || score.tier === "legendary";
-        const needsNaming = isNewDiscovery && isHighTier;
-
-        const maxSlotsUsed = Math.max(s.maxSlotsUsed, ids.length);
-        const cookCount = (existing?.cookCount ?? 0) + 1;
-
-        // Taste-to-reveal: enough cooks of one recipe reveal its pairs in the
-        // Journal mid-day (day-end reveal stays as the safety net; both skip
-        // already-known pairs). ">=" so pre-feature saves fire on next cook.
-        let tastedPairs = 0;
-        let discoveredAffinities = s.discoveredAffinities;
-        if (cookCount >= TASTE_COOKS_TO_REVEAL && ids.length >= 2) {
-          for (let i = 0; i < ids.length; i++) {
-            for (let j = i + 1; j < ids.length; j++) {
-              const key = affinityPairKey(ids[i], ids[j]);
-              if (discoveredAffinities[key] === undefined) {
-                if (discoveredAffinities === s.discoveredAffinities)
-                  discoveredAffinities = { ...s.discoveredAffinities };
-                discoveredAffinities[key] = matrix[ids[i]]?.[ids[j]] ?? 0;
-                tastedPairs++;
-              }
-            }
-          }
-        }
-
-        if (ids.length > 0) {
-          const entry: DiscoveredRecipe = isNewDiscovery
-            ? {
-                fingerprint,
-                ingredientIds: ids,
-                tier: score.tier,
-                multiplier: score.multiplier,
-                discoveredDay: s.currentDay,
-                cookCount,
-              }
-            : { ...existing!, cookCount };
-          set({
-            discoveredRecipes: { ...s.discoveredRecipes, [fingerprint]: entry },
-            maxSlotsUsed,
-            discoveredAffinities,
-          });
-        } else if (maxSlotsUsed !== s.maxSlotsUsed) {
-          set({ maxSlotsUsed });
-        }
-
+        const roll = rollSpin(s.totalSpins, eff.luck);
+        set((st) => ({
+          gachaInventory: capInventory(
+            [...st.gachaInventory, roll],
+            st.equippedUids,
+          ),
+          spinCount: st.spinCount + 1,
+          totalSpins: st.totalSpins + 1,
+          ...rarityRecords(st, roll),
+        }));
         get().refreshBadges();
-        return { fingerprint, isNewDiscovery, needsNaming, tastedPairs };
+        return roll;
       },
 
-      claimSet: (id) => {
+      // Trade-up: five of one rarity burn for one guaranteed roll of the next.
+      // Not a spin — the price ladder and lifetime spin counts stay put.
+      combine: (uids) => {
         const s = get();
-        if (s.claimedSets.includes(id)) return;
-        const cs = COLLECTION_SET_MAP[id];
-        if (!cs || setProgress(cs, s.discoveredAffinities) < cs.target) return;
-        set({ claimedSets: [...s.claimedSets, id] });
-        // ponytail: 2% of week earnings, floor 1k — same self-scaling knob
-        get().addCurry(Math.max(1_000, Math.floor(s.weekCurry * 0.02)));
-      },
+        if (uids.length !== COMBINE_COST) return null;
+        if (new Set(uids).size !== COMBINE_COST) return null;
+        const picked = uids.map((u) => s.gachaInventory.find((r) => r.uid === u));
+        if (picked.some((r) => !r)) return null;
+        const rarity = picked[0]!.rarity;
+        if (picked.some((r) => r!.rarity !== rarity)) return null;
+        const target = nextRarity(rarity);
+        // A "guaranteed upgrade" that silently demo-caps back down is a scam.
+        if (!target || demoCap(target) !== target) return null;
 
-      nameRecipe: (fingerprint, name) => {
-        const s = get();
-        const entry = s.discoveredRecipes[fingerprint];
-        if (!entry) return;
-        set({
-          discoveredRecipes: {
-            ...s.discoveredRecipes,
-            [fingerprint]: { ...entry, name: name.slice(0, 32) },
-          },
+        const roll = combineRoll(target, s.totalSpins);
+        const spent = new Set(uids);
+        set((st) => {
+          // Defensive: the UI blocks selecting equipped rolls, but a burnt uid
+          // must never survive in the equipped set.
+          const equippedUids = st.equippedUids.filter((u) => !spent.has(u));
+          return {
+            gachaInventory: capInventory(
+              [...st.gachaInventory.filter((r) => !spent.has(r.uid)), roll],
+              equippedUids,
+            ),
+            equippedUids,
+            ...rarityRecords(st, roll),
+          };
         });
         get().refreshBadges();
+        return roll;
       },
+
+      equip: (uid) => {
+        set((s) => {
+          if (s.equippedUids.includes(uid)) return {};
+          if (s.equippedUids.length >= MAX_EQUIPPED) return {};
+          if (!s.gachaInventory.some((r) => r.uid === uid)) return {};
+          return { equippedUids: [...s.equippedUids, uid] };
+        });
+        get().refreshBadges(); // Combo King reads the equipped set
+      },
+
+      unequip: (uid) =>
+        set((s) => ({ equippedUids: s.equippedUids.filter((u) => u !== uid) })),
+
+      discardRoll: (uid) =>
+        set((s) => ({
+          gachaInventory: s.gachaInventory.filter((r) => r.uid !== uid),
+          equippedUids: s.equippedUids.filter((u) => u !== uid),
+        })),
+
+      // --- skill tree ---
+
+      buySkillNode: (id) => {
+        const s = get();
+        const node = SKILL_MAP[id];
+        if (!node || s.skillNodes.includes(id)) return false;
+        if (!unlocked(node, s)) return false;
+        const cost = nodeCost(node, s.weeksCompleted);
+        if (s.currentCurry < cost) return false;
+
+        set((st) => ({
+          currentCurry: st.currentCurry - cost,
+          skillNodes: [...st.skillNodes, id],
+        }));
+        get().refreshBadges();
+        return true;
+      },
+
+      buyMetaNode: (id) => {
+        if (IS_DEMO) return false; // demo stops after one week — no meta layer
+        const s = get();
+        const node = META_MAP[id];
+        if (!node || s.metaNodes.includes(id)) return false;
+        if (!unlocked(node, s)) return false;
+        const cost = nodeCost(node, s.weeksCompleted); // star nodes are flat-priced
+        if (s.franchiseStars < cost) return false;
+
+        set((st) => ({
+          franchiseStars: st.franchiseStars - cost,
+          metaNodes: [...st.metaNodes, id],
+        }));
+        return true;
+      },
+
+      setActiveSkin: (skin) => set({ activeSkin: skin }),
 
       refreshBadges: () =>
         set((s) => {
@@ -976,19 +887,24 @@ export const useGameStore = create<GameState>()(
             0,
             ...s.dailySnapshots.map((d) => d.clicks),
           );
-          const namedRecipeCount = Object.values(s.discoveredRecipes).filter(
-            (r) => r.name,
-          ).length;
           const earned = evaluateBadges({
             totalCurry: s.totalCurryAllTime,
             maxDayClicks,
             weeksCompleted: s.weeksCompleted,
-            discoveredCount: Object.keys(s.discoveredRecipes).length,
-            highestTierSeen: s.highestTierSeen,
-            maxSlotsInRecipe: s.maxSlotsUsed,
-            specialClaimCount: s.specialClaimDays.length,
-            recipeStreakDays: s.recipeStreakDays,
-            namedRecipeCount,
+            distinctIngredients: new Set(
+              s.gachaInventory.map((r) => r.ingredientId),
+            ).size,
+            bestRarityEver:
+              s.bestRarityEver === "none" ? null : s.bestRarityEver,
+            maxEquippedMods: equippedRolls(s).reduce(
+              (sum, r) => sum + rollPower(r),
+              0,
+            ),
+            epicPulls: s.epicPulls,
+            fullBranches: BRANCH_NODE_IDS.filter((ids) =>
+              ids.every((id) => s.skillNodes.includes(id)),
+            ).length,
+            inventorySize: s.gachaInventory.length,
           });
           const union = new Set([...s.unlockedBadges, ...earned]);
           if (union.size === s.unlockedBadges.length) return {};
@@ -1003,127 +919,41 @@ export const useGameStore = create<GameState>()(
       name: SAVE_KEY,
       version: SAVE_VERSION,
       storage: saveStorage,
-      // Non-destructive migrations: older saves gain the new fields and keep all
-      // prior progress. v2→v3 added the restaurant-scene slice; v3→v4 added the
-      // onboarding flag; v4→v5 auto-places already-owned decorations; v5→v7 moves
-      // decorations onto the back/side wall slots.
+      // v16 replaced the recipe/shop/franchise layer with the gacha + skill
+      // tree. Nothing from the old economy maps onto the new one, so this is a
+      // deliberate hard wipe: settings and permanent records survive, all
+      // progress state starts fresh. (The incremental v3–v15 chain is gone.)
       migrate: (persisted, version) => {
         const p = (persisted ?? {}) as Record<string, unknown>;
-        // Pre-v13 placements addressed WALL_SLOTS by `col` index.
-        type LegacyPlacement = { instanceId: string; decorationId: string; col: number };
-        const nextFreeCol = (placements: LegacyPlacement[]): number | null => {
-          const used = new Set(placements.map((pl) => pl.col));
-          for (const i of WALL_PLACE_ORDER) if (!used.has(i)) return i;
-          return null;
-        };
-        if (version < 3) {
-          p.decorationPlacements = p.decorationPlacements ?? [];
-          p.activeSkin = p.activeSkin ?? "default";
-        }
-        if (version < 4) {
-          p.hasOnboarded = p.hasOnboarded ?? true;
-        }
-        if (version < 5) {
-          const owned = (p.ownedDecorations as Record<string, number>) ?? {};
-          const placements = [...((p.decorationPlacements as LegacyPlacement[]) ?? [])];
-          for (const [decoId, qty] of Object.entries(owned)) {
-            const have = placements.filter((pl) => pl.decorationId === decoId).length;
-            for (let i = have; i < qty; i++) {
-              const col = nextFreeCol(placements);
-              if (col === null) break;
-              placements.push({
-                instanceId: `${decoId}-mig-${i}`,
-                decorationId: decoId,
-                col,
-              });
-            }
-          }
-          p.decorationPlacements = placements;
-        }
-        if (version < 7) {
-          // Re-home decorations onto the back/side wall slots.
-          const repacked: LegacyPlacement[] = [];
-          for (const pl of (p.decorationPlacements as LegacyPlacement[]) ?? []) {
-            const col = nextFreeCol(repacked);
-            if (col === null) break;
-            repacked.push({ ...pl, col });
-          }
-          p.decorationPlacements = repacked;
-        }
-        if (version < 8) {
-          // Affinity Lens upgrade removed in favour of the Affinity Journal.
-          p.purchasedUpgrades = ((p.purchasedUpgrades as string[]) ?? []).filter(
-            (id) => id !== "affinity_lens",
-          );
-          delete p.affinityLens;
-          p.discoveredAffinities = p.discoveredAffinities ?? {};
-        }
-        if (version < 9) {
-          // Franchise (prestige) system: new persistent + weekly fields.
-          p.franchiseStars = p.franchiseStars ?? 0;
-          p.franchiseStarsEarned = p.franchiseStarsEarned ?? 0;
-          p.franchiseUpgrades = p.franchiseUpgrades ?? [];
-          p.cravingMatchDays = p.cravingMatchDays ?? 0;
-          p.lastWeekStars = p.lastWeekStars ?? null;
-        }
-        if (version < 10) {
-          // Sound settings split into SFX + music toggles and volumes.
-          const on = (p.soundOn as boolean) ?? true;
-          p.sfxOn = on;
-          p.musicOn = on;
-          p.sfxVolume = 1;
-          p.musicVolume = 0.7;
-          delete p.soundOn;
-        }
-        if (version < 11) {
-          // Daily leaderboard + end-of-day choices. The seed is now derived
-          // from the calendar date; ensureCurrentDate reseeds on first load.
-          p.dateId = p.dateId ?? "";
-          p.dailyCurry = p.dailyCurry ?? 0;
-          p.trophies = p.trophies ?? {};
-          p.pendingDayChoices = p.pendingDayChoices ?? null;
-          p.activeDayModifierId = p.activeDayModifierId ?? null;
-        }
-        if (version < 12) {
-          // Prestige became a daily loop; seed the all-time record from the
-          // old lifetime total so existing players don't open to 0.
-          p.bestFranchiseStars = p.bestFranchiseStars ?? p.franchiseStarsEarned ?? 0;
-        }
-        if (version < 13) {
-          // Free decoration placement: wall-slot indices become x/y percents.
-          // Auto-production is gone; its derived field goes with it.
-          delete p.autoProduction;
-          p.decorationPlacements = (
-            (p.decorationPlacements as (LegacyPlacement & Partial<Placement>)[]) ?? []
-          ).map((pl) => {
-            if (pl.xPct !== undefined && pl.yPct !== undefined) return pl;
-            const slot = WALL_SLOTS[pl.col] ?? WALL_SLOTS[0];
-            return {
-              instanceId: pl.instanceId,
-              decorationId: pl.decorationId,
-              xPct: slot.xPct,
-              yPct: slot.yPct,
-            };
-          });
-        }
-        if (version < 14) {
-          // Guided first run split into steps; anyone past the old welcome
-          // modal has seen it all.
-          p.tutorialStep = (p.hasOnboarded ?? true) ? "done" : "start";
-        }
-        if (version < 15) {
-          // Heal placements with non-finite coords (NaN serializes to null in
-          // JSON; v13's `!== undefined` check let those through). They render
-          // piled up in the scene's top-left corner — re-home them to free
-          // wall slots instead.
-          const healed: Placement[] = [];
-          for (const pl of (p.decorationPlacements as Placement[]) ?? []) {
-            if (Number.isFinite(pl.xPct) && Number.isFinite(pl.yPct)) healed.push(pl);
-            else healed.push({ ...pl, ...nextFreeSpot(healed) });
-          }
-          p.decorationPlacements = healed;
-        }
-        return p as unknown as GameState;
+        if (version >= 16) return p as unknown as GameState;
+
+        const hasOnboarded = (p.hasOnboarded as boolean) ?? true;
+        // Old saves mid-recipe-tutorial: that beat is gone, so land them in the
+        // guided week rather than on a step nothing advances past.
+        const raw = p.tutorialStep === "kitchen" ? "week1" : p.tutorialStep;
+        const tutorialStep: TutorialStep = TUTORIAL_STEPS.includes(
+          raw as TutorialStep,
+        )
+          ? (raw as TutorialStep)
+          : hasOnboarded
+            ? "done"
+            : "start";
+
+        return {
+          sfxOn: (p.sfxOn as boolean) ?? true,
+          musicOn: (p.musicOn as boolean) ?? true,
+          sfxVolume: (p.sfxVolume as number) ?? 1,
+          musicVolume: (p.musicVolume as number) ?? 0.7,
+          darkMode: (p.darkMode as boolean) ?? false,
+          hasOnboarded,
+          tutorialStep,
+          highScore: p.highScore ?? 0,
+          totalCurryAllTime: p.totalCurryAllTime ?? 0,
+          trophies: p.trophies ?? {},
+          unlockedBadges: p.unlockedBadges ?? [],
+          bestFranchiseStars: p.bestFranchiseStars ?? 0,
+          activeSkin: p.activeSkin ?? "default",
+        } as unknown as GameState;
       },
       partialize: (s) => ({
         currentCurry: s.currentCurry,
@@ -1131,6 +961,7 @@ export const useGameStore = create<GameState>()(
         weekCurry: s.weekCurry,
         highScore: s.highScore,
         todayCurry: s.todayCurry,
+        todayClicks: s.todayClicks,
         clicksThisWeek: s.clicksThisWeek,
         sfxOn: s.sfxOn,
         musicOn: s.musicOn,
@@ -1140,28 +971,21 @@ export const useGameStore = create<GameState>()(
         hasOnboarded: s.hasOnboarded,
         tutorialStep: s.tutorialStep,
         introsSeen: s.introsSeen,
-        todayClicks: s.todayClicks,
-        slots: s.slots,
-        ownedDecorations: s.ownedDecorations,
-        purchasedUpgrades: s.purchasedUpgrades,
-        unlockedSlots: s.unlockedSlots,
-        specialClaimDays: s.specialClaimDays,
-        recipeStreakDays: s.recipeStreakDays,
-        recipeStreakMultiplier: s.recipeStreakMultiplier,
-        highestTierSeen: s.highestTierSeen,
-        discoveredRecipes: s.discoveredRecipes,
-        discoveredAffinities: s.discoveredAffinities,
-        claimedSets: s.claimedSets,
+        gachaInventory: s.gachaInventory,
+        equippedUids: s.equippedUids,
+        spinCount: s.spinCount,
+        totalSpins: s.totalSpins,
+        epicPulls: s.epicPulls,
+        bestRarityThisWeek: s.bestRarityThisWeek,
+        bestRarityEver: s.bestRarityEver,
+        skillNodes: s.skillNodes,
+        metaNodes: s.metaNodes,
         unlockedBadges: s.unlockedBadges,
         weeksCompleted: s.weeksCompleted,
-        maxSlotsUsed: s.maxSlotsUsed,
         franchiseStars: s.franchiseStars,
         franchiseStarsEarned: s.franchiseStarsEarned,
         bestFranchiseStars: s.bestFranchiseStars,
-        franchiseUpgrades: s.franchiseUpgrades,
-        cravingMatchDays: s.cravingMatchDays,
         lastWeekStars: s.lastWeekStars,
-        decorationPlacements: s.decorationPlacements,
         activeSkin: s.activeSkin,
         phase: s.phase,
         weekId: s.weekId,
@@ -1175,6 +999,10 @@ export const useGameStore = create<GameState>()(
         pendingDayChoices: s.pendingDayChoices,
         activeDayModifierId: s.activeDayModifierId,
         usedDayModifierIds: s.usedDayModifierIds,
+        // bossDefeat is deliberately not persisted — the wipe it reports is
+        // already committed to the save.
+        bossHp: s.bossHp,
+        bossMaxHp: s.bossMaxHp,
       }),
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Record<string, unknown>;
@@ -1185,6 +1013,7 @@ export const useGameStore = create<GameState>()(
           const n = Number(v ?? 0);
           return Number.isFinite(n) && n > 0 ? Math.min(n, cap) : 0;
         };
+        const int = (v: unknown, cap = 1e9) => Math.floor(num(v, cap));
         const trophies = p.trophies
           ? Object.fromEntries(
               Object.entries(p.trophies as Record<string, unknown>).map(
@@ -1192,6 +1021,20 @@ export const useGameStore = create<GameState>()(
               ),
             )
           : current.trophies;
+
+        // Rolls are the save's most forgeable asset (a float of 9999 is a huge
+        // multiplier), so every one is re-validated and the inventory capped.
+        const gachaInventory = ((p.gachaInventory as unknown[]) ?? [])
+          .slice(0, MAX_INVENTORY)
+          .map(sanitizeRoll)
+          .filter((r): r is RolledIngredient => r !== null);
+        const uids = new Set(gachaInventory.map((r) => r.uid));
+        const equippedUids = [
+          ...new Set(((p.equippedUids as string[]) ?? []).filter((u) => uids.has(u))),
+        ].slice(0, MAX_EQUIPPED);
+        const rarity = (v: unknown): BestRarity =>
+          RARITIES.includes(v as GachaRarity) ? (v as GachaRarity) : "none";
+
         return {
           ...current,
           ...(p as object),
@@ -1204,13 +1047,31 @@ export const useGameStore = create<GameState>()(
           dailyCurry: Math.min(num(p.dailyCurry), num(p.totalCurryAllTime)),
           trophies,
           dailySnapshots: ((p.dailySnapshots as DailySnapshot[]) ?? []).map(
-            (snap) => ({ ...snap, curry: num(snap.curry) }),
+            (snap) => ({
+              day: snap.day,
+              curry: num(snap.curry),
+              clicks: snap.clicks,
+            }),
           ),
+          gachaInventory,
+          equippedUids,
+          skillNodes: ((p.skillNodes as string[]) ?? []).filter(
+            (id) => id in SKILL_MAP,
+          ),
+          metaNodes: ((p.metaNodes as string[]) ?? []).filter(
+            (id) => id in META_MAP,
+          ),
+          spinCount: int(p.spinCount),
+          totalSpins: int(p.totalSpins),
+          epicPulls: int(p.epicPulls),
+          bestRarityThisWeek: rarity(p.bestRarityThisWeek),
+          bestRarityEver: rarity(p.bestRarityEver),
+          // null = no fight in progress (pre-boss saves land here too); any
+          // number goes through the same clamp as the rest of the economy.
+          bossHp: p.bossHp == null ? null : num(p.bossHp),
+          bossMaxHp: p.bossMaxHp == null ? null : num(p.bossMaxHp),
+          bossDefeat: null,
         } as GameState;
-      },
-      // Recompute derived economy values from owned items after load.
-      onRehydrateStorage: () => (state) => {
-        state?.recomputeDerived();
       },
     },
   ),

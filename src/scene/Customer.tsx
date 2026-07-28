@@ -21,7 +21,7 @@ export interface CustomerView {
   seat: { u: number; v: number };
   state: CustomerState;
   reduced: boolean;
-  cravingMatched: boolean;
+  delighted: boolean; // served while the kitchen was On Fire
   expressive: boolean; // ~1 in 10 diners emote above their head
 }
 
@@ -34,7 +34,7 @@ const MOOD: Record<CustomerState, { icon: string; bg: string }> = {
   leaving: { icon: "sentiment_very_satisfied", bg: "bg-primary" }, // happy
 };
 
-// Served during a craving match -> extra-delighted variants (entering is
+// Served by an On Fire kitchen -> extra-delighted variants (entering is
 // unchanged: the customer hasn't tasted anything yet).
 const MOOD_MATCHED: Partial<Record<CustomerState, { icon: string; bg: string }>> = {
   eating: { icon: "favorite", bg: "bg-curry-orange" },
@@ -56,7 +56,7 @@ export function Customer({ c }: { c: CustomerView }) {
   // Stable palette variant per customer, so the dining room isn't clones.
   const anim = customerAnim(c.id)[moving ? "walk" : "idle"];
   const spriteH = 16 * PIXEL_SCALE * to.scale;
-  const delighted = c.cravingMatched && c.state !== "entering";
+  const delighted = c.delighted && c.state !== "entering";
   const mood = (delighted && MOOD_MATCHED[c.state]) || MOOD[c.state];
   const pulse = delighted && !c.reduced && c.expressive;
 
@@ -80,7 +80,7 @@ export function Customer({ c }: { c: CustomerView }) {
         </motion.div>
       )}
 
-      {/* craving-match sparkles */}
+      {/* delight sparkles */}
       {pulse &&
         [0, 1].map((i) => (
           <motion.span

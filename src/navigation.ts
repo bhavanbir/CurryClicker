@@ -1,12 +1,10 @@
 export type Screen =
   | "gameplay"
-  | "kitchen"
+  | "gacha"
   | "leaderboard"
   | "profile"
   | "settings"
-  | "journal"
-  | "franchise"
-  | "shop";
+  | "skills";
 
 export interface NavItem {
   screen: Screen;
@@ -18,10 +16,10 @@ import { IS_DEMO } from "./target";
 
 const ALL_NAV: NavItem[] = [
   { screen: "gameplay", label: "Cook", icon: "soup_kitchen" },
-  { screen: "kitchen", label: "Kitchen", icon: "skillet" },
-  { screen: "leaderboard", label: "Ranks", icon: "leaderboard" },
-  { screen: "profile", label: "Chef", icon: "account_circle" },
-  { screen: "shop", label: "Shop", icon: "storefront" },
+  { screen: "skills", label: "Curry Power", icon: "account_tree" },
+  { screen: "gacha", label: "Inventory", icon: "casino" },
+  { screen: "leaderboard", label: "Leaderboard", icon: "leaderboard" },
+  { screen: "profile", label: "Profile", icon: "account_circle" },
 ];
 
 // Primary nav (top bar on desktop, bottom bar on mobile). The Leaderboard is an

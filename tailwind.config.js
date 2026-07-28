@@ -8,7 +8,7 @@ export default {
         // Spicetone Arcade — light/warm palette from the Stitch mockups.
         // Neutrals AND the loud accents are CSS variables (RGB channels) so
         // `.dark` on <html> can swap the theme and desaturate the accents;
-        // quiet accents (great/legendary/rarity/most flavors) stay fixed.
+        // quiet accents (great/legendary tiers/most flavors) stay fixed.
         cream: {
           DEFAULT: "rgb(var(--cream) / <alpha-value>)",
           50: "rgb(var(--cream-50) / <alpha-value>)",
@@ -46,10 +46,14 @@ export default {
           savory: "#d97706",
           unique: "#a855f7",
         },
+        // Gacha rarities — channels so `.dark` can desaturate them (see index.css)
         rarity: {
-          common: "#d6d3d1",
-          uncommon: "#38bdf8",
-          rare: "#d946ef",
+          common: "rgb(var(--rarity-common) / <alpha-value>)",
+          uncommon: "rgb(var(--rarity-uncommon) / <alpha-value>)",
+          rare: "rgb(var(--rarity-rare) / <alpha-value>)",
+          epic: "rgb(var(--rarity-epic) / <alpha-value>)",
+          legendary: "rgb(var(--rarity-legendary) / <alpha-value>)",
+          curry: "rgb(var(--rarity-curry) / <alpha-value>)",
         },
       },
       // Backgrounds resolve separately from text/borders: bg-white is the panel

@@ -13,9 +13,9 @@ interface Props {
 
 export function TopBar({ screen, onNavigate, onFeedback }: Props) {
   const currentCurry = useGameStore((s) => s.currentCurry);
-  // Guided week: the Shop tab appears when the shop unlocks (day 3).
-  const shopUnlocked = useFeatureUnlocked("shop");
-  const nav = PRIMARY_NAV.filter((i) => shopUnlocked || i.screen !== "shop");
+  // Guided week: the Skills tab appears when the skill tree unlocks (day 3).
+  const skillsUnlocked = useFeatureUnlocked("skills");
+  const nav = PRIMARY_NAV.filter((i) => skillsUnlocked || i.screen !== "skills");
 
   return (
     <header className="fixed inset-x-0 top-0 z-40 border-b-4 border-ink bg-cream shadow-[0_4px_0_0_#191c1e]">
@@ -50,7 +50,7 @@ export function TopBar({ screen, onNavigate, onFeedback }: Props) {
               <button
                 key={item.screen}
                 type="button"
-                data-tut={item.screen === "kitchen" ? "nav-kitchen" : undefined}
+                data-tut={item.screen === "gacha" ? "nav-gacha" : undefined}
                 onClick={() => onNavigate(item.screen)}
                 className={`flex items-center gap-1.5 rounded-lg border-2 px-3 py-1.5 text-sm font-bold uppercase tracking-wide transition-all ${
                   active

@@ -1,43 +1,36 @@
 import { useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { useGameStore, useFeatureUnlocked } from "../store/useGameStore";
-import { useRecipeScore, useEffects } from "../hooks/useRecipeScore";
-import { getAffinityData, affinityPairKey } from "../engine/affinityEngine";
-import { recipeFingerprint } from "../engine/cookbook";
-import { TASTE_COOKS_TO_REVEAL } from "../config";
-import { handleClick, type ClickMods } from "../engine/clickEngine";
-import { getDailySpecial, getDailyCraving } from "../engine/weekEngine";
+import { useEffects } from "../hooks/useEffects";
+import { handleClick, computeClickValue } from "../engine/clickEngine";
+import { RARITY_OF, type GachaRarity } from "../engine/gacha";
 import { DAY_CHOICE_MAP } from "../engine/dayChoices";
+import { DAYS_PER_WEEK } from "../config";
 import { INGREDIENTS } from "../engine/ingredients";
 import { formatCurry } from "../lib/format";
+import { shakeScene, flashScene } from "../lib/juice";
 import { playCook, playCrit, playDiscovery } from "../lib/sfx";
 import type { Screen } from "../navigation";
 import { ScoreDisplay } from "../components/ScoreDisplay";
 import { DayProgressBar } from "../components/DayProgressBar";
-import { AffinityBadge } from "../components/AffinityBadge";
 import { RestaurantScene } from "../scene/RestaurantScene";
+import { BossScene } from "../scene/BossScene";
 import { FloatText, type Float } from "../components/FloatText";
 import { ClickBurst } from "../components/ClickBurst";
 import { PixelIcon } from "../components/PixelIcon";
-import { CravingBar } from "../components/CravingBar";
 import { StartDayModal } from "../components/StartDayModal";
-import { ChefSpecialPanel } from "../components/ChefSpecialPanel";
-import { FlavorTag } from "../components/FlavorTag";
-import { RecipeNamingModal } from "../components/RecipeNamingModal";
 import { StatChip } from "../components/arcade/StatChip";
 import { Icon } from "../components/arcade/Icon";
 import { ArcadeButton } from "../components/arcade/ArcadeButton";
 import { ArcadePanel } from "../components/arcade/ArcadePanel";
-import { IS_DEMO, DEMO_DECORATIONS } from "../target";
+import { IS_DEMO } from "../target";
 import { SteamCta } from "../components/SteamCta";
 import { FeedbackModal } from "../components/FeedbackModal";
 import { useCrazyCurry } from "../hooks/useCrazyCurry";
 import { useOnFire } from "../hooks/useOnFire";
-import { UPGRADES, DECORATIONS, upgradeCost, decorationCost } from "../engine/shopData";
 
 interface Props {
   onNavigate: (s: Screen) => void;
-  onOpenShop: () => void;
 }
 
 let floatId = 0;
@@ -75,16 +68,27 @@ const CRIT_TIERS = [
   { mult: 25, weight: 3, size: 38, ms: 600, className: "bg-flavor-unique text-white" },
   { mult: 100, weight: 1, size: 28, ms: 300, className: "bg-ink text-curry-yellow" },
 ] as const;
-type CritTier = (typeof CRIT_TIERS)[number];
 
-function rollCritTier(biasLow = false): CritTier {
+// Boss day runs the same reaction game on a shorter, meaner table: no ×1.1
+// consolation tier, everything is a real hit. Weights sum to 100.
+const SUPER_TIERS = [
+  { mult: 3, weight: 55, size: 88, ms: 4000, className: "bg-curry-yellow text-ink" },
+  { mult: 10, weight: 30, size: 64, ms: 2000, className: "bg-curry-orange text-white" },
+  { mult: 30, weight: 12, size: 48, ms: 1000, className: "bg-tier-terrible text-white" },
+  { mult: 100, weight: 3, size: 32, ms: 500, className: "bg-ink text-curry-yellow" },
+] as const;
+
+type CritTier = (typeof CRIT_TIERS)[number] | (typeof SUPER_TIERS)[number];
+type TierTable = readonly CritTier[];
+
+function rollCritTier(tiers: TierTable, biasLow = false): CritTier {
   const roll = () => {
     let r = Math.random() * 100;
-    for (const t of CRIT_TIERS) {
+    for (const t of tiers) {
       r -= t.weight;
       if (r < 0) return t;
     }
-    return CRIT_TIERS[0];
+    return tiers[0];
   };
   const first = roll();
   if (!biasLow) return first;
@@ -94,6 +98,22 @@ function rollCritTier(biasLow = false): CritTier {
 }
 
 const CHAIN_CAP = 3; // max jackpot-chain depth after the first crit click
+
+// Explosion/shake power for a crit: log-scaled so ×1.1 barely twitches (~0.05)
+// and ×100 maxes out (2.4) — the payout is legible from the juice alone.
+function critPower(mult: number): number {
+  return (Math.log10(mult) / Math.log10(100)) * 2.4;
+}
+
+// Literal class names so Tailwind's scanner emits them (no dynamic strings).
+const RARITY_RING: Record<GachaRarity, string> = {
+  common: "border-rarity-common",
+  uncommon: "border-rarity-uncommon",
+  rare: "border-rarity-rare",
+  epic: "border-rarity-epic",
+  legendary: "border-rarity-legendary",
+  currylicious: "border-rarity-curry",
+};
 
 // Spam-click rewards: escalating shout-outs at daily click milestones keep a
 // mash streak feeling like it's constantly unlocking something new.
@@ -111,42 +131,36 @@ const CLICK_MILESTONES: {
   { at: 1000, label: "SPICE GOD! ×1000", sfx: "legendary", power: 2 },
 ];
 
-export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
-  const slots = useGameStore((s) => s.slots);
-  const seed = useGameStore((s) => s.seed);
+export function GameplayScreen({ onNavigate }: Props) {
   const currentDay = useGameStore((s) => s.currentDay);
-  const streakDays = useGameStore((s) => s.recipeStreakDays);
-  const streakMult = useGameStore((s) => s.recipeStreakMultiplier);
+  const damageBoss = useGameStore((s) => s.damageBoss);
   const addCurry = useGameStore((s) => s.addCurry);
   const registerClick = useGameStore((s) => s.registerClick);
-  const claimSpecial = useGameStore((s) => s.claimSpecial);
-  const logCook = useGameStore((s) => s.logCook);
   const dayStarted = useGameStore((s) => s.dayStarted);
   const dayPaused = useGameStore((s) => s.dayPaused);
   const startDay = useGameStore((s) => s.startDay);
   const togglePause = useGameStore((s) => s.togglePause);
-  const setPaused = useGameStore((s) => s.setPaused);
   const weeksCompleted = useGameStore((s) => s.weeksCompleted);
   const totalCurryAllTime = useGameStore((s) => s.totalCurryAllTime);
-  const highestTierSeen = useGameStore((s) => s.highestTierSeen);
-  const lastWeekStars = useGameStore((s) => s.lastWeekStars);
-  const discoveredRecipes = useGameStore((s) => s.discoveredRecipes);
-  const discoveredAffinities = useGameStore((s) => s.discoveredAffinities);
+  const bestRarityEver = useGameStore((s) => s.bestRarityEver);
   const franchiseStarsEarned = useGameStore((s) => s.franchiseStarsEarned);
   const activeDayModifierId = useGameStore((s) => s.activeDayModifierId);
   const todayClicks = useGameStore((s) => s.todayClicks);
+  const gachaInventory = useGameStore((s) => s.gachaInventory);
+  const equippedUids = useGameStore((s) => s.equippedUids);
   const tutorialStep = useGameStore((s) => s.tutorialStep);
   // Guided first run: day 1 shows only the core loop; side systems then
   // unlock one in-game day at a time (FEATURE_UNLOCK_DAY).
   const tutorialStart = tutorialStep === "start";
-  const shopUnlocked = useFeatureUnlocked("shop");
-  const cravingUnlocked = useFeatureUnlocked("craving");
-  const specialUnlocked = useFeatureUnlocked("special");
   const dayMod = activeDayModifierId ? DAY_CHOICE_MAP[activeDayModifierId] : undefined;
+
+  // The last day of the week is the boss fight: different scene, different
+  // crit table, same cook() — all damage still flows through the guarded path.
+  const bossDay = currentDay === DAYS_PER_WEEK;
+  const tiers: TierTable = bossDay ? SUPER_TIERS : CRIT_TIERS;
 
   const demoEnded = IS_DEMO && weeksCompleted >= 1;
 
-  const score = useRecipeScore();
   const effects = useEffects();
   const [floats, setFloats] = useState<Float[]>([]);
   const [crit, setCrit] = useState<{
@@ -159,94 +173,72 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
     liveAt: number; // reaction-floor anchor: live time (or telegraph start when chained)
   } | null>(null);
   const critHoverRef = useRef(false); // mouse currently over the crit circle
-  const reduced = useReducedMotion() ?? false;
-  const onFire = useOnFire();
+  const onFire = useOnFire(effects.fireGainMult);
   const [cookSignal, setCookSignal] = useState(0);
-  const [namingFp, setNamingFp] = useState<string | null>(null);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [startDayOpen, setStartDayOpen] = useState(false);
   const sceneWrapRef = useRef<HTMLDivElement>(null);
+  const flashRef = useRef<HTMLDivElement>(null);
 
-  const filled = slots.filter(Boolean) as string[];
-  const hasRecipe = filled.length > 0;
+  const shake = (magPx: number) => shakeScene(sceneWrapRef.current, magPx);
+  const flash = () => flashScene(flashRef.current);
 
-  const special = getDailySpecial(currentDay, seed);
-  const specialActive =
-    slots.includes(special.ingredientA) && slots.includes(special.ingredientB);
-  const craving = getDailyCraving(currentDay, seed);
-  const mods: ClickMods = {
-    specialMultiplier: specialActive ? special.bonusMultiplier : 1,
-    streakMultiplier: streakMult,
-    craving,
-  };
+  const equipped = equippedUids
+    .map((uid) => gachaInventory.find((r) => r.uid === uid))
+    .filter((r): r is NonNullable<typeof r> => !!r);
 
-  const perCook = Math.floor(
-    handleClick(slots, getAffinityData(seed).matrix, effects, mods).value *
-      (dayMod?.clickMult ?? 1),
-  );
+  // Preview value: one cook with no crit/crazy/fire riding on it.
+  const perCook = Math.floor(computeClickValue(effects) * (dayMod?.clickMult ?? 1));
+  /** What a crit circle of `mult` actually pays, crit-power effects included. */
+  const critPayout = (mult: number) =>
+    Math.floor(perCook * (1 + (mult - 1) * effects.critPowerMult));
 
-  // Taste-to-reveal progress for the standing recipe (any pair still unknown?)
-  const hasUntastedPair =
-    filled.length >= 2 &&
-    filled.some((a, i) =>
-      filled
-        .slice(i + 1)
-        .some((b) => discoveredAffinities[affinityPairKey(a, b)] === undefined),
-    );
-  const tasteCount = Math.min(
-    discoveredRecipes[recipeFingerprint(slots)]?.cookCount ?? 0,
-    TASTE_COOKS_TO_REVEAL,
-  );
-
-  const crazy = useCrazyCurry(hasRecipe && dayStarted && !dayPaused && !demoEnded);
+  const crazy = useCrazyCurry(dayStarted && !dayPaused && !demoEnded);
 
   function cook(x: number, y: number, critMult = 1) {
-    if (!hasRecipe || !dayStarted || dayPaused) return; // shop closed or paused
+    if (!dayStarted || dayPaused) return; // shop closed or paused
     // Anti-cheat gate: focused window, real recent input, human-plausible rate.
     const nowMs = performance.now();
     if (!document.hasFocus() || nowMs - lastTrustedInput > 100) return;
     while (cookTimes.length > 0 && nowMs - cookTimes[0] > 1000) cookTimes.shift();
     if (cookTimes.length >= CPS_CAP) return;
     cookTimes.push(nowMs);
-    const result = handleClick(slots, getAffinityData(seed).matrix, effects, mods);
+    const result = handleClick(effects);
     if (result.value <= 0) return;
 
     const crazyMult = crazy.registerCook();
     const fireMult = onFire.registerCook();
+    // Crit power effects amplify the circle's own multiplier, never the base.
+    const critApplied = 1 + (critMult - 1) * effects.critPowerMult;
     const value = Math.floor(
-      result.value * crazyMult * critMult * fireMult * (dayMod?.clickMult ?? 1),
+      result.value * crazyMult * critApplied * fireMult * (dayMod?.clickMult ?? 1),
     );
     if (value <= 0) return;
 
     addCurry(value);
     registerClick();
+    // Curry is damage, one for one — crits, On Fire and Crazy Curry all land
+    // on the boss for free. The killing blow ends the week inside this call.
+    if (bossDay) {
+      damageBoss(value);
+      if (useGameStore.getState().phase === "week_summary") {
+        flash();
+        shake(14);
+      }
+    }
     playCook(onFire.heat / 100);
 
     const milestone = CLICK_MILESTONES.find((m) => m.at === todayClicks + 1);
     if (milestone) {
       playDiscovery(milestone.sfx);
-      if (milestone.power === 2) shakeScene("sm");
+      if (milestone.power === 2) shake(5);
       const mid = floatId++;
       setFloats((f) =>
-        [...f, { id: mid, x, y: y - 56, label: `🏆 ${milestone.label}`, power: milestone.power }].slice(-12),
+        [...f, { id: mid, x, y: y - 56, label: milestone.label, power: milestone.power }].slice(-12),
       );
       window.setTimeout(
         () => setFloats((f) => f.filter((fl) => fl.id !== mid)),
         1100,
-      );
-    }
-
-    if (result.isSpecial) claimSpecial(currentDay);
-    const outcome = logCook(slots);
-    if (outcome.needsNaming) setNamingFp(outcome.fingerprint);
-    if (outcome.tastedPairs > 0) {
-      const tasteId = floatId++;
-      setFloats((f) =>
-        [...f, { id: tasteId, x, y: y - 40, label: `Tasted! +${outcome.tastedPairs} pairs` }].slice(-12),
-      );
-      window.setTimeout(
-        () => setFloats((f) => f.filter((fl) => fl.id !== tasteId)),
-        800,
       );
     }
     setCookSignal((n) => n + 1);
@@ -254,24 +246,38 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
     // 25% chance to spawn a critical circle (if none is up) — click it before
     // it expires for the tier's multiplier. Crit clicks skip this roll; their
     // follow-up comes from the jackpot chain in clickCrit instead.
-    const critChance = Math.min(0.4 * (dayMod?.critChanceMult ?? 1), 0.9);
+    const critChance = Math.min(
+      0.4 * (dayMod?.critChanceMult ?? 1) * effects.critChanceMult,
+      0.9,
+    );
     if (critMult === 1 && !crit && Math.random() < critChance) {
-      spawnCrit(rollCritTier(dayMod?.critBiasLow), 0);
+      spawnCrit(rollCritTier(tiers, dayMod?.critBiasLow), 0);
     }
 
     const id = floatId++;
     let label = "+" + formatCurry(value);
-    if (critMult > 1) label += ` CRIT ×${critMult}!`;
-    else if (crazyMult > 1) label += ` ×${crazyMult}!`;
-    else if (result.isSpecial) label += " ×2!";
-    else if (fireMult > 1) label += ` 🔥×${fireMult}`;
-    // Feedback scales with importance: jackpots > crits/crazy > routine cooks.
-    const power: 0 | 1 | 2 =
-      critMult >= 25 ? 2 : critMult > 1 || crazyMult > 1 ? 1 : 0;
+    if (critMult >= 25) label += " JACKPOT!";
+    else if (critMult > 1) label += "!";
+    // Feedback scales with the payout: crits ride a log curve, a crazy-event
+    // cook gets one notch, routine cooks stay quiet. Crit bursts are floored at
+    // 1.5 so even a ×1.1 circle detonates a real curry explosion (shock ring +
+    // curry palette); the shake alone carries the low-tier/high-tier contrast.
+    const power =
+      critMult > 1
+        ? Math.max(1.5, critPower(critMult))
+        : crazyMult > 1
+          ? 1
+          : 0;
+    if (critMult > 1) {
+      // Shake rides the raw curve (not the burst floor) so tiers stay distinct.
+      shake(2 + critPower(critMult) * 5.5);
+      if (critMult >= 25) flash();
+    }
     setFloats((f) => [...f, { id, x, y, label, power }].slice(-12)); // cap under mash
     window.setTimeout(
       () => setFloats((f) => f.filter((fl) => fl.id !== id)),
-      power === 2 ? 1100 : 800,
+      // Explosion confetti flies up to ~1.7s (duration + sparkle delay).
+      power >= 1.5 ? 1800 : 800,
     );
   }
 
@@ -302,52 +308,17 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
     }
   }
 
-  // Scene shake for big moments only (never plain clicks — over-juicing reads
-  // as noise). Direct classList toggle: no rerender, restarts cleanly.
-  function shakeScene(strength: "sm" | "lg") {
-    const el = sceneWrapRef.current;
-    if (!el || reduced) return;
-    el.classList.remove("shake-sm", "shake-lg");
-    void el.offsetWidth; // reflow so re-adding restarts the animation
-    el.classList.add(`shake-${strength}`);
-  }
-
-  // Full-scene warm flash — jackpot crits only, the rarest moment we have.
-  const flashRef = useRef<HTMLDivElement>(null);
-  function flashScene() {
-    const el = flashRef.current;
-    if (!el || reduced) return;
-    el.classList.remove("scene-flash");
-    void el.offsetWidth;
-    el.classList.add("scene-flash");
-  }
-
   // On Fire ignition (stage 2) gets a small shake.
   const prevFireStageRef = useRef(onFire.stage);
   useEffect(() => {
-    if (onFire.stage === 2 && prevFireStageRef.current < 2) shakeScene("sm");
+    if (onFire.stage === 2 && prevFireStageRef.current < 2) shake(5);
     prevFireStageRef.current = onFire.stage;
   }, [onFire.stage]);
 
   // Crazy Curry event start gets a small shake.
   useEffect(() => {
-    if (crazy.event) shakeScene("sm");
+    if (crazy.event) shake(5);
   }, [crazy.event?.startedAt]);
-
-  // Naming a recipe freezes the day clock. Track whether *we* paused so
-  // closing the modal never unpauses a manually paused day.
-  const autoPausedRef = useRef(false);
-  useEffect(() => {
-    if (namingFp) {
-      if (!useGameStore.getState().dayPaused) {
-        setPaused(true);
-        autoPausedRef.current = true;
-      }
-    } else if (autoPausedRef.current) {
-      autoPausedRef.current = false;
-      setPaused(false);
-    }
-  }, [namingFp, setPaused]);
 
   // Day end sweeps any live crit circle off the screen; the pending expiry
   // timeouts are id-guarded so they no-op against the cleared state.
@@ -358,11 +329,23 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
   function spawnCrit(tier: CritTier, chain: number) {
     const rect = sceneWrapRef.current?.getBoundingClientRect();
     if (!rect) return;
+    // Boss day: circles spawn on the boss's body, so chasing one is aiming at
+    // the boss. Its bounds are offset back into scene coordinates, leaving the
+    // render/hover/spacebar paths below identical.
+    const body = bossDay
+      ? sceneWrapRef.current
+          ?.querySelector("[data-boss-body]")
+          ?.getBoundingClientRect()
+      : undefined;
+    const left = body ? body.left - rect.left : 0;
+    const top = body ? body.top - rect.top : 0;
+    const width = body?.width ?? rect.width;
+    const height = body?.height ?? rect.height;
     const margin = tier.size / 2 + 8;
     const critId = floatId++;
     critHoverRef.current = false;
-    const x = margin + Math.random() * Math.max(1, rect.width - margin * 2);
-    const y = margin + Math.random() * Math.max(1, rect.height - margin * 2);
+    const x = left + margin + Math.random() * Math.max(1, width - margin * 2);
+    const y = top + margin + Math.random() * Math.max(1, height - margin * 2);
     if (chain === 0) {
       setCrit({ id: critId, x, y, tier, chain, phase: "live", liveAt: performance.now() });
       window.setTimeout(
@@ -394,15 +377,13 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
     if (!dayStarted || dayPaused) return;
     setCrit(null);
     critHoverRef.current = false;
-    cook(c.x, c.y, c.tier.mult);
+    cook(c.x, c.y, c.tier.mult); // shake/flash scale with the tier inside cook()
     playCrit(c.tier.mult);
-    if (c.tier.mult >= 5) shakeScene(c.tier.mult >= 25 ? "lg" : "sm");
-    if (c.tier.mult >= 25) flashScene();
     // Jackpot chain: chance to spawn a rarer, one-tier-higher follow-up.
     // Odds shrink per step (35% → 25% → 15%), capped at CHAIN_CAP deep.
-    const idx = CRIT_TIERS.indexOf(c.tier);
+    const idx = tiers.indexOf(c.tier);
     if (c.chain < CHAIN_CAP && Math.random() < 0.35 - 0.1 * c.chain) {
-      spawnCrit(CRIT_TIERS[Math.min(idx + 1, CRIT_TIERS.length - 1)], c.chain + 1);
+      spawnCrit(tiers[Math.min(idx + 1, tiers.length - 1)], c.chain + 1);
     }
   }
 
@@ -454,7 +435,7 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
       {!tutorialStart && (
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
-          <StatChip icon="calendar_today" label="Day" value={`${currentDay}/7`} />
+          <StatChip icon="calendar_today" label="Day" value={`${currentDay}/${DAYS_PER_WEEK}`} />
           {dayStarted && (
             <button
               type="button"
@@ -469,11 +450,7 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
           )}
         </div>
         <ScoreDisplay />
-        {streakDays >= 2 ? (
-          <StatChip icon="whatshot" label="Streak" value={`${streakMult.toFixed(2)}×`} />
-        ) : (
-          <div className="w-[88px]" />
-        )}
+        <div className="w-[88px]" />
       </div>
       )}
 
@@ -481,12 +458,18 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
 
       {/* Restaurant scene + floats */}
       <div ref={sceneWrapRef} className="relative">
-        {specialUnlocked && <ChefSpecialPanel />}
+        {bossDay ? (
+          <BossScene
+            cookSignal={cookSignal}
+            onCook={cook}
+            busy={dayStarted && !dayPaused}
+          />
+        ) : (
         <RestaurantScene
           cookSignal={cookSignal}
           onCook={cook}
-          busy={hasRecipe && dayStarted && !dayPaused}
-          cravingMatched={score.cravingMatched ?? false}
+          busy={dayStarted && !dayPaused}
+          onFire={onFire.stage === 2}
           onDinerFed={() => {
             // Diners tip base click value (no crit/crazy/fire mults), scaled
             // by expansion tier — bigger rooms are a real income line.
@@ -508,11 +491,17 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
             );
           }}
         />
+        )}
         <AnimatePresence>
           {floats.map((f) => (
             <div key={f.id}>
               <ClickBurst x={f.x} y={f.y} power={f.power} tint={f.id} />
-              <FloatText x={f.x} y={f.y} label={f.label} power={f.power} />
+              <FloatText
+                x={f.x}
+                y={f.y}
+                label={f.label}
+                power={Math.min(2, Math.round(f.power ?? 0))}
+              />
             </div>
           ))}
         </AnimatePresence>
@@ -521,7 +510,6 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
         <div
           ref={flashRef}
           className="pointer-events-none absolute inset-0 z-40 rounded-xl opacity-0"
-          style={{ backgroundColor: "#fff3d6" }}
         />
 
         {/* Critical circle — click (or hover + spacebar) before it expires.
@@ -543,7 +531,7 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
             <motion.button
               key={crit.id}
               type="button"
-              aria-label={`Critical hit! ×${crit.tier.mult}`}
+              aria-label={`Critical hit worth ${formatCurry(critPayout(crit.tier.mult))} curry`}
               initial={{ scale: 0 }}
               animate={{ scale: [0, 1.35, 1] }}
               exit={{ scale: 0, opacity: 0 }}
@@ -551,18 +539,30 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
               onPointerDown={() => clickCrit(crit)}
               onPointerEnter={() => (critHoverRef.current = true)}
               onPointerLeave={() => (critHoverRef.current = false)}
-              className={`absolute z-40 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-4 border-ink font-display font-black crit-glow ${crit.tier.className}`}
+              className={`absolute z-40 flex items-center justify-center rounded-full border-4 border-ink font-display font-black crit-glow ${crit.tier.className}`}
+              // Centering rides framer's own transform, not Tailwind's: the
+              // scale animation writes an inline `transform` that would drop a
+              // `-translate-x-1/2` class outright, anchoring the circle at its
+              // top-left (and out past the boss's edges on boss day).
               style={{
                 left: crit.x,
                 top: crit.y,
+                x: "-50%",
+                y: "-50%",
                 width: crit.tier.size,
                 height: crit.tier.size,
-                fontSize: Math.max(9, Math.round(crit.tier.size * 0.24)),
               }}
             >
-              ×{crit.tier.mult}
+              {/* The circle keeps its size (difficulty is unchanged); the reward
+                  is stated in real curry on the pill above it. */}
+              <span
+                className="leading-none"
+                style={{ fontSize: Math.max(10, Math.round(crit.tier.size * 0.28)) }}
+              >
+                ×{crit.tier.mult}
+              </span>
               {crit.chain > 0 && (
-                <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded border border-ink bg-curry-yellow px-1 text-[8px] font-black uppercase text-ink">
+                <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded border border-ink bg-curry-yellow px-1 text-[8px] font-black uppercase text-ink">
                   Chain
                 </span>
               )}
@@ -584,8 +584,9 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
         {onFire.heat > 0 && (
           <div className="pointer-events-none absolute bottom-2 left-1/2 z-30 w-1/2 -translate-x-1/2">
             {onFire.stage === 2 && (
-              <div className="mb-0.5 text-center font-display text-[10px] font-black uppercase tracking-widest text-white [text-shadow:1px_1px_0_#191c1e]">
-                🔥 On Fire ×1.5
+              <div className="mb-0.5 flex items-center justify-center gap-1 font-display text-[10px] font-black uppercase tracking-widest text-white [text-shadow:1px_1px_0_#191c1e]">
+                <Icon name="local_fire_department" fill size={14} />
+                On Fire +{formatCurry(Math.floor(perCook * (onFire.mult - 1)))}
               </div>
             )}
             <div className="h-2 overflow-hidden rounded-full border-2 border-ink bg-white/70">
@@ -605,15 +606,16 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
 
         {/* First-cook hint — sits over the scene until the first tap lands */}
         <AnimatePresence>
-          {dayStarted && !dayPaused && hasRecipe && todayClicks === 0 && (
+          {dayStarted && !dayPaused && todayClicks === 0 && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center"
             >
-              <span className="animate-bounce rounded-xl border-4 border-ink bg-white px-4 py-2 font-display text-lg font-black uppercase text-ink shadow-arcade">
-                👆 Tap here to cook!
+              <span className="flex animate-bounce items-center gap-2 rounded-xl border-4 border-ink bg-white px-4 py-2 font-display text-lg font-black uppercase text-ink shadow-arcade">
+                <Icon name="touch_app" fill size={24} />
+                Tap here to cook!
               </span>
             </motion.div>
           )}
@@ -621,7 +623,7 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
 
       </div>
 
-      {/* Active recipe bar */}
+      {/* Equipped ingredients + primary action */}
       {demoEnded ? (
         <ArcadePanel className="flex flex-col gap-4 p-5">
           <div className="flex items-center gap-2">
@@ -631,9 +633,9 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
             </h2>
           </div>
           <p className="text-sm font-semibold text-ink/70">
-            A fresh affinity matrix lands every real day — the full game lets
-            you chase it day after day, with 45 ingredients,
-            the 5th slot, skins, and the whole Franchise catalog.
+            The full game keeps the gacha running: 60 ingredients across six
+            rarities, the whole skill tree, skins, and a fresh week to chase
+            every real day.
           </p>
           <div className="grid grid-cols-3 gap-2">
             <DemoStat
@@ -642,17 +644,9 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
               value={formatCurry(totalCurryAllTime, 1)}
             />
             <DemoStat
-              icon="restaurant"
-              label="Best tier"
-              value={
-                lastWeekStars?.reasons.some((r) => r.includes("Legendary"))
-                  ? "Legendary"
-                  : lastWeekStars?.reasons.some((r) => r.includes("Great"))
-                    ? "Great"
-                    : highestTierSeen !== "none"
-                      ? highestTierSeen
-                      : "—"
-              }
+              icon="casino"
+              label="Best pull"
+              value={bestRarityEver === "none" ? "—" : bestRarityEver}
             />
             <DemoStat
               icon="stars"
@@ -671,51 +665,27 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
           </button>
         </ArcadePanel>
       ) : (
-      <ArcadePanel className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-        {hasRecipe ? (
-          <>
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-1.5">
-                {filled.map((id, i) => (
-                  <span
-                    key={i}
-                    className="flex h-9 w-9 items-center justify-center rounded-md border-2 border-ink bg-white"
-                  >
-                    <PixelIcon id={id} icon={INGREDIENTS[id].icon} size={32} iconClassName={INGREDIENTS[id].color} />
-                  </span>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => onNavigate("kitchen")}
-                  className="ml-1 flex h-8 w-8 items-center justify-center rounded-md border-2 border-dashed border-ink/40 text-ink/40"
-                  aria-label="Edit recipe"
-                >
-                  <Icon name="edit" size={18} />
-                </button>
-              </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <AffinityBadge tier={score.tier} multiplier={score.multiplier} />
-                <FlavorTag flavor={score.flavor} craving={craving} tier={score.tier} />
-                <span className="text-sm font-bold text-ink/60">
-                  +{formatCurry(perCook)} / click
-                </span>
-                {hasUntastedPair && (
-                  <span className="cramped-hide flex items-center gap-1 text-sm font-bold text-ink/60">
-                    <Icon name="science" size={16} />
-                    Tasting… {tasteCount}/{TASTE_COOKS_TO_REVEAL}
-                  </span>
-                )}
-              </div>
-            </div>
-          </>
-        ) : (
-          <div className="flex items-center gap-2 text-sm font-semibold text-ink/70">
-            <Icon name="info" className="text-primary" size={20} />
-            {tutorialStart
-              ? "Your first recipe is prepped — press Start to open shop!"
-              : "No recipe yet — open the Kitchen to cook one up!"}
+      <div className="flex flex-col items-center gap-3 p-4">
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-1.5">
+            {equipped.map((r) => (
+              <span
+                key={r.uid}
+                title={INGREDIENTS[r.ingredientId].name}
+                className={`flex h-9 w-9 items-center justify-center rounded-md border-2 bg-white ${
+                  RARITY_RING[RARITY_OF[r.ingredientId]]
+                }`}
+              >
+                <PixelIcon
+                  id={r.ingredientId}
+                  icon={INGREDIENTS[r.ingredientId].icon}
+                  size={32}
+                  iconClassName={INGREDIENTS[r.ingredientId].color}
+                />
+              </span>
+            ))}
           </div>
-        )}
+        </div>
 
         {/* Active end-of-day deal, so the trade-off stays visible all day. */}
         {dayMod && (
@@ -728,42 +698,28 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
           </div>
         )}
 
-        {/* Primary action: build a recipe → open the day → cook. The day clock
-            only starts when the player presses Start Day. */}
+        {/* Primary action: open the day → cook. The day clock only starts when
+            the player presses Start Day. */}
         <ArcadeButton
           size="xl"
           data-tut="start-btn"
-          variant={
-            !hasRecipe && !tutorialStart
-              ? "tertiary"
-              : !dayStarted || dayPaused
-                ? "buy"
-                : "primary"
-          }
-          className={!hasRecipe || (!dayStarted && !dayPaused) ? "animate-pulse" : undefined}
+          variant={!dayStarted || dayPaused ? "buy" : "primary"}
+          className={!dayStarted && !dayPaused ? "animate-pulse" : undefined}
           onClick={
-            // First run: the day starts on the spot (startDay seeds a starter
-            // recipe) — no Kitchen detour, no confirmation modal.
+            // First run: the day starts on the spot — no confirmation modal.
             tutorialStart
               ? startDay
-              : !hasRecipe
-                ? () => onNavigate("kitchen")
-                : !dayStarted
-                  ? () => setStartDayOpen(true)
-                  : dayPaused
-                    ? togglePause
-                    : cookFromButton
+              : !dayStarted
+                ? () => setStartDayOpen(true)
+                : dayPaused
+                  ? togglePause
+                  : cookFromButton
           }
         >
           {tutorialStart ? (
             <>
               <Icon name="play_arrow" fill size={28} />
               Start Day 1
-            </>
-          ) : !hasRecipe ? (
-            <>
-              <Icon name="skillet" fill size={26} />
-              Open Kitchen
             </>
           ) : !dayStarted ? (
             <>
@@ -782,12 +738,8 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
             </>
           )}
         </ArcadeButton>
-      </ArcadePanel>
+      </div>
       )}
-
-      {!demoEnded && shopUnlocked && <GoalBar onOpenShop={onOpenShop} />}
-
-      {!demoEnded && cravingUnlocked && <CravingBar />}
 
       {startDayOpen && (
         <StartDayModal
@@ -795,76 +747,12 @@ export function GameplayScreen({ onNavigate, onOpenShop }: Props) {
             setStartDayOpen(false);
             startDay();
           }}
-          onChangeRecipe={() => {
-            setStartDayOpen(false);
-            onNavigate("kitchen");
-          }}
           onClose={() => setStartDayOpen(false)}
         />
       )}
 
-      {namingFp && (
-        <RecipeNamingModal fingerprint={namingFp} onClose={() => setNamingFp(null)} />
-      )}
-
       {IS_DEMO && feedbackOpen && <FeedbackModal onClose={() => setFeedbackOpen(false)} />}
     </div>
-  );
-}
-
-// Near-miss goal bar: progress toward the cheapest eligible shop item, flips
-// to a pulsing READY! when affordable. Eligibility mirrors ShopNotifier.
-function GoalBar({ onOpenShop }: { onOpenShop: () => void }) {
-  const currentCurry = useGameStore((s) => s.currentCurry);
-  const purchasedUpgrades = useGameStore((s) => s.purchasedUpgrades);
-  const ownedDecorations = useGameStore((s) => s.ownedDecorations);
-  const weeksCompleted = useGameStore((s) => s.weeksCompleted);
-
-  let target: { name: string; icon: string; tone: string; cost: number } | null =
-    null;
-  for (const u of UPGRADES) {
-    if (IS_DEMO && u.id === "slot_5") continue;
-    if (purchasedUpgrades.includes(u.id)) continue;
-    if (u.prerequisiteUpgradeId && !purchasedUpgrades.includes(u.prerequisiteUpgradeId)) continue;
-    const cost = upgradeCost(u, weeksCompleted);
-    if (!target || cost < target.cost)
-      target = { name: u.name, icon: u.icon, tone: u.tone, cost };
-  }
-  for (const d of DECORATIONS) {
-    if (IS_DEMO && !DEMO_DECORATIONS.includes(d.id)) continue;
-    const qty = ownedDecorations[d.id] ?? 0;
-    if (qty >= d.maxQuantity) continue;
-    const cost = decorationCost(d, qty);
-    if (!target || cost < target.cost)
-      target = { name: d.name, icon: d.icon, tone: d.tone, cost };
-  }
-  if (!target) return null;
-
-  const ready = currentCurry >= target.cost;
-  const pct = Math.min(100, (currentCurry / target.cost) * 100);
-  return (
-    <button
-      type="button"
-      onClick={onOpenShop}
-      className="relative flex h-9 w-full items-center gap-2 overflow-hidden rounded-lg border-2 border-ink bg-white px-2 text-left shadow-arcade-sm"
-    >
-      <div
-        className={`absolute inset-y-0 left-0 transition-[width] duration-300 ${
-          ready ? "animate-pulse bg-buy" : "bg-curry-yellow/60"
-        }`}
-        style={{ width: `${pct}%` }}
-      />
-      <span
-        className={`relative flex h-6 w-6 shrink-0 items-center justify-center rounded border-2 border-ink ${target.tone}`}
-      >
-        <Icon name={target.icon} fill size={14} className="text-ink" />
-      </span>
-      <span className="relative truncate text-xs font-extrabold text-ink">
-        {ready
-          ? `${target.name} — READY!`
-          : `${target.name} — ${formatCurry(currentCurry)} / ${formatCurry(target.cost)}`}
-      </span>
-    </button>
   );
 }
 

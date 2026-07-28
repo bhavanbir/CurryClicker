@@ -1,11 +1,6 @@
-// Calendar identity + seed, derived locally so the affinity matrix is shared
-// by anyone playing the same calendar day — no backend. The week id remains
-// for the in-game week loop's display/rollover.
-
-import type { DailySpecial, DailySnapshot, Flavor, RecipeTier } from "../types";
-import { FLAVORS, BASE_INGREDIENT_IDS } from "./ingredients";
-import { IS_DEMO, DEMO_LOCKED_INGREDIENT_SET } from "../target";
-import { makeRng } from "../lib/rng";
+// Calendar identity + seed, derived locally so daily systems (rivals, day
+// choices) are shared by anyone playing the same calendar day — no backend.
+// The week id remains for the in-game week loop's display/rollover.
 
 // Anti-cheat: on desktop the clock is anchored to Steam server time (synced in
 // useWeeklySeed), so changing the system clock can't force day/week rollovers.
@@ -34,8 +29,8 @@ export function getCurrentWeekId(d: Date = now()): string {
   return `${date.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
 }
 
-// Local calendar date, e.g. "2026-07-07". The affinity matrix, daily rivals,
-// and daily leaderboard all reseed when this rolls over at local midnight.
+// Local calendar date, e.g. "2026-07-07". Daily rivals, day choices, and the
+// daily leaderboard all reseed when this rolls over at local midnight.
 export function getCurrentDateId(d: Date = now()): string {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
@@ -50,63 +45,4 @@ export function seedFromWeekId(weekId: string): number {
     h = Math.imul(h, 16777619);
   }
   return h >>> 0;
-}
-
-// Chef's Special (framework §8): a deterministic ingredient duo per (seed, day)
-// worth a 2× cook bonus when both are slotted. Same for all players that day.
-export const SPECIAL_BONUS_MULTIPLIER = 2.0;
-
-export function getDailySpecial(day: number, seed: number): DailySpecial {
-  const rng = makeRng(`${seed}-special-day${day}`);
-  const ids = IS_DEMO
-    ? BASE_INGREDIENT_IDS.filter((id) => !DEMO_LOCKED_INGREDIENT_SET.has(id))
-    : BASE_INGREDIENT_IDS;
-  const a = ids[Math.floor(rng() * ids.length)];
-  let b = ids[Math.floor(rng() * ids.length)];
-  while (b === a) b = ids[Math.floor(rng() * ids.length)];
-  return {
-    day,
-    ingredientA: a,
-    ingredientB: b,
-    bonusMultiplier: SPECIAL_BONUS_MULTIPLIER,
-  };
-}
-
-// Daily Craving: one flavour the town wants today, deterministic per (seed, day)
-// so it changes daily and reshuffles when the weekly seed rolls over. A recipe
-// whose flavour matches earns a bonus; a mismatch caps legendary at great.
-export function getDailyCraving(day: number, seed: number): Flavor {
-  const rng = makeRng(`${seed}-craving-day${day}`);
-  return FLAVORS[Math.floor(rng() * FLAVORS.length)];
-}
-
-// Recipe Streak (framework §9): consecutive days ending at tier good+ build a
-// multiplier; any neutral-or-below day resets it.
-const STREAK_MULTIPLIERS: Record<number, number> = {
-  0: 1.0,
-  1: 1.0,
-  2: 1.05,
-  3: 1.08,
-  4: 1.12,
-  5: 1.15,
-  6: 1.2,
-  7: 1.25,
-};
-
-const STREAK_QUALIFYING_TIERS: RecipeTier[] = ["good", "great", "legendary"];
-
-export function streakMultiplierFor(days: number): number {
-  return STREAK_MULTIPLIERS[Math.min(days, 7)] ?? 1.0;
-}
-
-export function evaluateStreak(
-  snapshot: Pick<DailySnapshot, "tierAtDayEnd">,
-  currentStreakDays: number,
-): { newStreakDays: number; newMultiplier: number } {
-  const qualifies = STREAK_QUALIFYING_TIERS.includes(snapshot.tierAtDayEnd);
-  const newStreakDays = qualifies ? Math.min(currentStreakDays + 1, 7) : 0;
-  return {
-    newStreakDays,
-    newMultiplier: streakMultiplierFor(newStreakDays),
-  };
 }

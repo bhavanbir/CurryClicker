@@ -1,5 +1,6 @@
 import { useRef, useState, type ReactNode } from "react";
 import { useGameStore, SAVE_KEY, SAVE_VERSION } from "../store/useGameStore";
+import { SKINS, SKIN_ORDER } from "../scene/skins";
 import { WEEK_DURATION_MS } from "../config";
 import type { Screen } from "../navigation";
 import { Icon } from "../components/arcade/Icon";
@@ -22,6 +23,8 @@ export function SettingsScreen({ onNavigate }: Props) {
   const setAudio = useGameStore((s) => s.setAudio);
   const darkMode = useGameStore((s) => s.darkMode);
   const toggleDark = useGameStore((s) => s.toggleDark);
+  const activeSkin = useGameStore((s) => s.activeSkin);
+  const setActiveSkin = useGameStore((s) => s.setActiveSkin);
   const replayOnboarding = useGameStore((s) => s.replayOnboarding);
   const hardReset = useGameStore((s) => s.hardReset);
   const [confirmReset, setConfirmReset] = useState(false);
@@ -120,6 +123,29 @@ export function SettingsScreen({ onNavigate }: Props) {
           on={darkMode}
           onToggle={toggleDark}
         />
+        <div className="flex flex-col gap-1.5">
+          <span className="flex items-center gap-2 text-sm font-bold text-ink">
+            <Icon name="palette" size={20} className="text-primary" />
+            Restaurant skin
+          </span>
+          <div className="flex flex-wrap gap-2">
+            {SKIN_ORDER.map((skin) => (
+              <button
+                key={skin}
+                type="button"
+                aria-pressed={activeSkin === skin}
+                onClick={() => setActiveSkin(skin)}
+                className={`rounded-lg border-2 border-ink px-3 py-1.5 text-xs font-black uppercase tracking-wide shadow-arcade-sm transition-all ${
+                  activeSkin === skin
+                    ? "bg-primary text-white"
+                    : "bg-white text-ink hover:-translate-y-0.5"
+                }`}
+              >
+                {SKINS[skin].label}
+              </button>
+            ))}
+          </div>
+        </div>
         <ArcadeButton
           size="lg"
           className="w-full"

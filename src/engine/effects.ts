@@ -1,98 +1,87 @@
-// Aggregates owned upgrades + decorations into the flat set of numeric effects
-// the click/auto pipelines consume. Pure: same inputs → same output.
+// Folds purchased skill nodes + equipped gacha rolls into the flat set of
+// numeric effects the click/spin/scene pipelines consume. Pure: same inputs →
+// same output.
 
-import {
-  UPGRADE_MAP,
-  DECORATION_MAP,
-  DECOR_SETS,
-  decorSetComplete,
-  prestigeBaseClick,
-  ladleValue,
-} from "./shopData";
-import { franchiseBaseSlots, reputationMultiplier } from "./franchiseData";
-import { BASE_UNLOCKED_SLOTS, MAX_SLOTS } from "../config";
-import { IS_DEMO, DEMO_MAX_SLOTS } from "../target";
-
-const SLOT_CAP = IS_DEMO ? DEMO_MAX_SLOTS : MAX_SLOTS;
+import { SKILL_MAP, META_MAP, prestigeBaseClick } from "./skillTree";
+import { modMagnitude, type RolledIngredient } from "./gacha";
 
 export interface ActiveEffects {
-  clickMultiplier: number; // product of click_multiplier upgrades
-  flatClickBonus: number; // click_flat upgrades + decoration passiveClickBonus
-  decorSetMultiplier: number; // product of completed decoration-set bonuses
-  unlockedSlots: number; // base + recipe_slot_unlock upgrades
-  spicePairAffinityBonus: number; // flat affinity added to spice/spice pairs
-  spiceClickBonusPerSpice: number; // flat cook value per spice ingredient
+  clickMult: number; // includes the prestige base-click multiplier
+  flatClick: number;
+  globalMult: number; // star Reputation, highest tier wins
+  critChanceMult: number;
+  critPowerMult: number;
+  fireGainMult: number;
+  spinCostMult: number; // ≤ 1; multiplied into spinCost()
+  luck: number; // additive bias toward rarer gacha pulls
   expansionLevel: number; // 0–5: restaurant size (tables + customer flow)
-  globalMultiplier: number; // franchise Reputation ×curry, applied to all earnings
-}
-
-export function computeEffects(
-  purchasedUpgrades: string[],
-  ownedDecorations: Record<string, number>,
-  franchiseUpgrades: string[] = [],
-  prestigeLevel = 0,
-): ActiveEffects {
-  let clickMultiplier = prestigeBaseClick(prestigeLevel);
-  let flatClickBonus = 0;
-  let unlockedSlots = franchiseBaseSlots(franchiseUpgrades);
-  let expansionLevel = 0;
-
-  for (const id of purchasedUpgrades) {
-    const eff = UPGRADE_MAP[id]?.effect;
-    if (!eff) continue;
-    switch (eff.type) {
-      case "click_multiplier":
-        clickMultiplier *= ladleValue(UPGRADE_MAP[id], prestigeLevel);
-        break;
-      case "click_flat":
-        flatClickBonus += eff.value;
-        break;
-      case "recipe_slot_unlock":
-        unlockedSlots = Math.max(unlockedSlots, eff.slotIndex + 1);
-        break;
-      case "restaurant_expansion":
-        expansionLevel = Math.max(expansionLevel, eff.level);
-        break;
-    }
-  }
-
-  let spicePairAffinityBonus = 0;
-  let spiceClickBonusPerSpice = 0;
-
-  for (const [id, qtyRaw] of Object.entries(ownedDecorations)) {
-    const deco = DECORATION_MAP[id];
-    if (!deco) continue;
-    const qty = Math.min(qtyRaw, deco.maxQuantity);
-    if (qty <= 0) continue;
-    flatClickBonus += deco.passiveClickBonus * qty;
-    spicePairAffinityBonus += (deco.spicePairAffinity ?? 0) * qty;
-    spiceClickBonusPerSpice += (deco.spiceClickBonus ?? 0) * qty;
-  }
-
-  let decorSetMultiplier = 1;
-  for (const set of DECOR_SETS) {
-    if (decorSetComplete(set, ownedDecorations)) decorSetMultiplier *= set.clickMult;
-  }
-
-  return {
-    clickMultiplier,
-    flatClickBonus,
-    decorSetMultiplier,
-    unlockedSlots: Math.min(unlockedSlots, SLOT_CAP),
-    spicePairAffinityBonus,
-    spiceClickBonusPerSpice,
-    expansionLevel,
-    globalMultiplier: reputationMultiplier(franchiseUpgrades),
-  };
 }
 
 export const NO_EFFECTS: ActiveEffects = {
-  clickMultiplier: 1,
-  flatClickBonus: 0,
-  decorSetMultiplier: 1,
-  unlockedSlots: BASE_UNLOCKED_SLOTS,
-  spicePairAffinityBonus: 0,
-  spiceClickBonusPerSpice: 0,
+  clickMult: 1,
+  flatClick: 0,
+  globalMult: 1,
+  critChanceMult: 1,
+  critPowerMult: 1,
+  fireGainMult: 1,
+  spinCostMult: 1,
+  luck: 0,
   expansionLevel: 0,
-  globalMultiplier: 1,
 };
+
+export function computeEffects(
+  skillNodes: string[],
+  metaNodes: string[],
+  equipped: RolledIngredient[] = [],
+  prestigeLevel = 0,
+): ActiveEffects {
+  const e: ActiveEffects = {
+    ...NO_EFFECTS,
+    clickMult: prestigeBaseClick(prestigeLevel),
+  };
+
+  const apply = (type: string, value: number) => {
+    switch (type) {
+      case "click_mult":
+        e.clickMult *= 1 + value;
+        break;
+      case "flat_click":
+        e.flatClick += value;
+        break;
+      case "crit_chance":
+        e.critChanceMult *= 1 + value;
+        break;
+      case "crit_power":
+        e.critPowerMult *= 1 + value;
+        break;
+      case "fire_gain":
+        e.fireGainMult *= 1 + value;
+        break;
+      // Discounts stack the other way: each one shaves a share off the price.
+      case "spin_discount":
+        e.spinCostMult *= Math.max(0, 1 - value);
+        break;
+      case "luck":
+        e.luck += value;
+        break;
+    }
+  };
+
+  for (const id of [...skillNodes, ...metaNodes]) {
+    const eff = (SKILL_MAP[id] ?? META_MAP[id])?.effect;
+    if (!eff) continue;
+    if (eff.type === "expansion") {
+      e.expansionLevel = Math.max(e.expansionLevel, eff.level);
+    } else if (eff.type === "global_mult") {
+      e.globalMult = Math.max(e.globalMult, eff.value); // tiers replace, never stack
+    } else if (eff.type !== "head_start") {
+      apply(eff.type, eff.value);
+    }
+  }
+
+  for (const roll of equipped) {
+    for (const mod of roll.mods) apply(mod.type, modMagnitude(mod, roll.rarity));
+  }
+
+  return e;
+}
